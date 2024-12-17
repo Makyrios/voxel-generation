@@ -5,6 +5,7 @@
 
 #include "ProceduralMeshComponent.h"
 #include "FastNoiseWrapper.h"
+#include "Actors/ChunkWorld.h"
 #include "Objects/ChunkData.h"
 #include "VoxelGen/Enums.h"
 
@@ -85,6 +86,14 @@ void AChunk::GenerateMesh()
 	}
 }
 
+void AChunk::CreateFace(EDirection Direction, const FVector& Position)
+{
+	Verticies.Append(GetFaceVerticies(Direction, Position));
+	UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
+	Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
+	VertexCount += 4;
+}
+
 void AChunk::ApplyMesh() const
 {
 	Mesh->CreateMeshSection(0, Verticies, Triangles, TArray<FVector>(), UV, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
@@ -92,21 +101,73 @@ void AChunk::ApplyMesh() const
 
 bool AChunk::CheckIsAir(const FVector& Position) const
 {
+	return GetBlockAtPosition(Position) == EBlock::Air;
+}
+
+void AChunk::RegenerateMesh()
+{
+	Verticies.Reset();
+	UV.Reset();
+	Triangles.Reset();
+	VertexCount = 0;
+	GenerateMesh();
+	ApplyMesh();
+}
+
+EBlock AChunk::GetBlockAtPosition(const FVector& Position) const
+{
 	if (Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
 		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
 		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize)
 	{
-		return Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)] == EBlock::Air;
+		return Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)];
 	}
-	return true;
+	else
+	{
+		if (!ParentWorld) return EBlock::Air;
+
+		if (Position.Z < 0 || Position.Z >= FChunkData::ChunkSize) return EBlock::Air;
+		
+		FVector2D AdjChunkPos = ChunkPosition;
+		FVector BlockPosition = Position;
+		
+		if (Position.X < 0)
+		{
+			AdjChunkPos.X -= 1;
+			BlockPosition.X += FChunkData::ChunkSize;
+		}
+		else if (Position.X >= FChunkData::ChunkSize)
+		{
+			AdjChunkPos.X += 1;
+			BlockPosition.X -= FChunkData::ChunkSize;
+		}
+		if (Position.Y < 0)
+		{
+			AdjChunkPos.Y -= 1;
+			BlockPosition.Y += FChunkData::ChunkSize;
+		}
+		else if (Position.Y >= FChunkData::ChunkSize)
+		{
+			AdjChunkPos.Y += 1;
+			BlockPosition.Y -= FChunkData::ChunkSize;
+		}
+
+		if (!ParentWorld->GetChunksData().Contains(AdjChunkPos)) return EBlock::Air;
+		
+		AChunk* adjChunk = ParentWorld->GetChunksData()[AdjChunkPos];
+		if (!adjChunk) return EBlock::Air;
+		
+		return adjChunk->GetBlockAtPosition(BlockPosition);
+	}
 }
 
-void AChunk::CreateFace(EDirection Direction, const FVector& Position)
+int AChunk::GetBlockIndex(int X, int Y, int Z) const
 {
-	Verticies.Append(GetFaceVerticies(Direction, Position));
-	UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
-	Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
-	VertexCount += 4;
+	if (X < 0 || X >= FChunkData::ChunkSize || Y < 0 || Y >= FChunkData::ChunkSize || Z < 0 || Z >= FChunkData::ChunkSize)
+	{
+		throw std::out_of_range("Block out of chunk range");
+	}
+	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkSize;
 }
 
 TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Position) const
@@ -134,14 +195,5 @@ FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Posi
 	case EDirection::Down: return Position + FVector::DownVector;
 	default: throw std::invalid_argument("Invalid direction");	
 	}
-}
-
-int AChunk::GetBlockIndex(int X, int Y, int Z) const
-{
-	if (X < 0 || X >= FChunkData::ChunkSize || Y < 0 || Y >= FChunkData::ChunkSize || Z < 0 || Z >= FChunkData::ChunkSize)
-	{
-		throw std::out_of_range("Block out of chunk range");
-	}
-	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkSize;
 }
 

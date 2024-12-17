@@ -16,6 +16,8 @@ class VOXELGEN_API AChunkWorld : public AActor
 public:	
 	AChunkWorld();
 
+	const TMap<FVector2D, AChunk*>& GetChunksData() { return ChunksData; }
+
 protected:
 	virtual void BeginPlay() override;
 

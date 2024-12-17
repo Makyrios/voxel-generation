@@ -33,8 +33,14 @@ void AChunkWorld::CreateChunks()
 			float xPos = x * FChunkData::ChunkSize * FChunkData::BlockSize * FChunkData::BlockScale;
 			float yPos = y * FChunkData::ChunkSize * FChunkData::BlockSize * FChunkData::BlockScale;
 			AChunk* Chunk = GetWorld()->SpawnActor<AChunk>(ChunkClass, FVector(xPos, yPos, 0), FRotator::ZeroRotator);
+			Chunk->ChunkPosition = FVector2D(x, y);
+			Chunk->SetParentWorld(this);
 			ChunksData.Add(FVector2D(x, y), Chunk);
 		}
+	}
+	for (auto& [Pos, Chunk] : ChunksData)
+	{
+		Chunk->RegenerateMesh();
 	}
 }
 

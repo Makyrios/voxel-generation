@@ -11,6 +11,7 @@ enum class EBlock;
 
 class UProceduralMeshComponent;
 class UFastNoiseWrapper;
+class AChunkWorld;
 
 UCLASS()
 class VOXELGEN_API AChunk : public AActor
@@ -20,8 +21,34 @@ class VOXELGEN_API AChunk : public AActor
 public:
 	AChunk();
 
+	void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
+
+	void RegenerateMesh();
+	
+	EBlock GetBlockAtPosition(const FVector& Position) const;
+
 protected:
 	virtual void BeginPlay() override;
+
+private:
+	void GenerateBlocks();
+
+	void GenerateMesh();
+
+	void ApplyMesh() const;
+
+	bool CheckIsAir(const FVector& Position) const;
+
+	void CreateFace(EDirection Direction, const FVector& Position);
+
+	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& Position) const;
+
+	FVector GetPositionInDirection(EDirection Direction, const FVector& Position) const;
+
+	int GetBlockIndex(int X, int Y, int Z) const;
+
+public:
+	FVector2D ChunkPosition;
 	
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -30,6 +57,8 @@ protected:
 private:
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	TObjectPtr<UFastNoiseWrapper> Noise;
+	
+	AChunkWorld* ParentWorld;
 
 	TArray<EBlock> Blocks;
 
@@ -58,22 +87,5 @@ private:
 		5,4,1,0, // Up
 		3,2,7,6  // Down
 	};
-
-private:
-	void GenerateBlocks();
-
-	void GenerateMesh();
-
-	void ApplyMesh() const;
-
-	bool CheckIsAir(const FVector& Position) const;
-
-	void CreateFace(EDirection Direction, const FVector& Position);
-
-	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& Position) const;
-
-	FVector GetPositionInDirection(EDirection Direction, const FVector& Position) const;
-
-	int GetBlockIndex(int X, int Y, int Z) const;
 	
 };
