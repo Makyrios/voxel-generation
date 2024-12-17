@@ -25,17 +25,10 @@ protected:
 	
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int ChunkSize = 16;
-	
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int Scale = 1;
-	
-	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float Frequency = 0.03;
 
 private:
 	TObjectPtr<UProceduralMeshComponent> Mesh;
-
 	TObjectPtr<UFastNoiseWrapper> Noise;
 
 	TArray<EBlock> Blocks;
@@ -65,8 +58,6 @@ private:
 		5,4,1,0, // Up
 		3,2,7,6  // Down
 	};
-	
-	const int BlockSize = 100;
 
 private:
 	void GenerateBlocks();

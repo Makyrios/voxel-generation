@@ -3,10 +3,9 @@
 
 #include "Actors/Chunk.h"
 
-#include <stdexcept>
-
 #include "ProceduralMeshComponent.h"
 #include "FastNoiseWrapper.h"
+#include "Objects/ChunkData.h"
 #include "VoxelGen/Enums.h"
 
 AChunk::AChunk()
@@ -15,20 +14,17 @@ AChunk::AChunk()
 
 	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
 	Mesh->SetCastShadow(false);
-
+	
 	Noise = CreateDefaultSubobject<UFastNoiseWrapper>("Noise");
+	Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
+
 }
 
 void AChunk::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (Noise)
-	{
-		Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
-	}
 	
-	Blocks.SetNum(ChunkSize * ChunkSize * ChunkSize);
+	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkSize);
 
 	GenerateBlocks();
 	
@@ -43,22 +39,22 @@ void AChunk::GenerateBlocks()
 	
 	const FVector Location = GetActorLocation();
 
-	for (int x = 0; x < ChunkSize; ++x)
+	for (int x = 0; x < FChunkData::ChunkSize; ++x)
 	{
-		for (int y = 0; y < ChunkSize; ++y)
+		for (int y = 0; y < FChunkData::ChunkSize; ++y)
 		{
-			const float XPos = (x * BlockSize + Location.X) / BlockSize;
-			const float YPos = (y * BlockSize + Location.Y) / BlockSize;
+			const float XPos = (x * FChunkData::BlockSize * FChunkData::BlockScale + Location.X) / (FChunkData::BlockSize * FChunkData::BlockScale);
+			const float YPos = (y * FChunkData::BlockSize * FChunkData::BlockScale + Location.Y) / (FChunkData::BlockSize * FChunkData::BlockScale);
 
 			// Get the height of the block at the current x and y position by getting the noise value at the x and y position and then scaling it to the chunk height
-			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise2D(XPos, YPos) + 1) * ChunkSize / 2), 0, ChunkSize);
+			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise2D(XPos, YPos) + 1) * FChunkData::ChunkSize * FChunkData::BlockScale / 2), 0, FChunkData::ChunkSize);
 
 			for (int z = 0; z < Height; ++z)
 			{
 				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
 			}
 
-			for (int z = Height; z < ChunkSize; ++z)
+			for (int z = Height; z < FChunkData::ChunkSize; ++z)
 			{
 				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
 			}
@@ -68,11 +64,11 @@ void AChunk::GenerateBlocks()
 
 void AChunk::GenerateMesh()
 {
-	for (int x = 0; x < ChunkSize; ++x)
+	for (int x = 0; x < FChunkData::ChunkSize; ++x)
 	{
-		for (int y = 0; y < ChunkSize; ++y)
+		for (int y = 0; y < FChunkData::ChunkSize; ++y)
 		{
-			for (int z = 0; z < ChunkSize; ++z)
+			for (int z = 0; z < FChunkData::ChunkSize; ++z)
 			{
 				if (Blocks[GetBlockIndex(x, y, z)] == EBlock::Air) continue;
 				
@@ -81,7 +77,7 @@ void AChunk::GenerateMesh()
 					FVector Position = FVector(x, y, z);
 					if (CheckIsAir(GetPositionInDirection(Direction, Position)))
 					{
-						CreateFace(Direction, Position * BlockSize);
+						CreateFace(Direction, Position * FChunkData::BlockSize * FChunkData::BlockScale);
 					}
 				}
 			}
@@ -96,9 +92,9 @@ void AChunk::ApplyMesh() const
 
 bool AChunk::CheckIsAir(const FVector& Position) const
 {
-	if (Position.X >= 0 && Position.X < ChunkSize &&
-		Position.Y >= 0 && Position.Y < ChunkSize &&
-		Position.Z >= 0 && Position.Z < ChunkSize)
+	if (Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
+		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
+		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize)
 	{
 		return Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)] == EBlock::Air;
 	}
@@ -120,7 +116,7 @@ TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Po
 	for (int i = 0; i < 4; i++)
 	{
 		// Get the verticies for the face by getting the index of the verticies from the triangle data
-		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * Scale + Position);
+		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * FChunkData::BlockScale + Position);
 	}
 
 	return FaceVerticies;
@@ -142,10 +138,10 @@ FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Posi
 
 int AChunk::GetBlockIndex(int X, int Y, int Z) const
 {
-	if (X < 0 || X >= ChunkSize || Y < 0 || Y >= ChunkSize || Z < 0 || Z >= ChunkSize)
+	if (X < 0 || X >= FChunkData::ChunkSize || Y < 0 || Y >= FChunkData::ChunkSize || Z < 0 || Z >= FChunkData::ChunkSize)
 	{
 		throw std::out_of_range("Block out of chunk range");
 	}
-	return X + Y * ChunkSize + Z * ChunkSize * ChunkSize;
+	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkSize;
 }
 
