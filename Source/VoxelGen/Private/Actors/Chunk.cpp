@@ -15,15 +15,16 @@ AChunk::AChunk()
 
 	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
 	Mesh->SetCastShadow(false);
+	RootComponent = Mesh;
 	
 	Noise = CreateDefaultSubobject<UFastNoiseWrapper>("Noise");
-	Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
-
 }
 
 void AChunk::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
 	
 	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkSize);
 
@@ -97,6 +98,7 @@ void AChunk::CreateFace(EDirection Direction, const FVector& Position)
 void AChunk::ApplyMesh() const
 {
 	Mesh->CreateMeshSection(0, Verticies, Triangles, TArray<FVector>(), UV, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+	Mesh->AddCollisionConvexMesh(Verticies);
 }
 
 bool AChunk::CheckIsAir(const FVector& Position) const

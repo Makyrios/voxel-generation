@@ -55,9 +55,11 @@ protected:
 	float Frequency = 0.03;
 
 private:
+	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	TObjectPtr<UFastNoiseWrapper> Noise;
-	
+
+	UPROPERTY()
 	AChunkWorld* ParentWorld;
 
 	TArray<EBlock> Blocks;
