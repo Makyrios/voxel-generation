@@ -50,6 +50,9 @@ private:
 	TObjectPtr<UCameraComponent> FirstPersonCameraComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta=(AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> InputMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta=(AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> JumpAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta=(AllowPrivateAccess = "true"))

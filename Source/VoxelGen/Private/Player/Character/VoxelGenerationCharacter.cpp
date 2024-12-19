@@ -34,7 +34,15 @@ void AVoxelGenerationCharacter::BeginPlay()
 }
 
 void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
+{
+	const APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController) return;
+	
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+	{
+		Subsystem->AddMappingContext(InputMappingContext, 0);
+	}
+	
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
