@@ -7,6 +7,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Actors/Chunk.h"
+#include "Objects/ChunkData.h"
+#include "VoxelGen/Enums.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -51,10 +54,8 @@ void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* Playe
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Move);
 
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Look);
-	}
-	else
-	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+
+		EnhancedInputComponent->BindAction(SpawnBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::SpawnBlock);
 	}
 }
 
@@ -78,5 +79,33 @@ void AVoxelGenerationCharacter::Look(const FInputActionValue& Value)
 	{
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AVoxelGenerationCharacter::SpawnBlock()
+{
+	FHitResult HitResult;
+	FVector TraceStart = FirstPersonCameraComponent->GetComponentLocation();
+	FVector TraceEnd = TraceStart + FirstPersonCameraComponent->GetForwardVector() * InteractionRange;
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+	if (!bHit) return;
+
+	const FVector& HitLocation = HitResult.Location;
+	const FVector& ImpactNormal = HitResult.ImpactNormal;
+	float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
+
+	FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
+
+	FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
+
+	FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
+	FVector WorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(SpawnBlockPosition);
+	
+	if (AChunk* Chunk = Cast<AChunk>(HitResult.GetActor()))
+	{
+		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
+		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
+		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Stone);
 	}
 }

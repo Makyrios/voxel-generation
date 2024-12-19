@@ -15,7 +15,7 @@ AChunk::AChunk()
 
 	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
 	Mesh->SetCastShadow(false);
-	RootComponent = Mesh;
+	SetRootComponent(Mesh);
 	
 	Noise = CreateDefaultSubobject<UFastNoiseWrapper>("Noise");
 }
@@ -72,11 +72,11 @@ void AChunk::GenerateMesh()
 		{
 			for (int z = 0; z < FChunkData::ChunkSize; ++z)
 			{
-				if (Blocks[GetBlockIndex(x, y, z)] == EBlock::Air) continue;
+				if (GetBlockAtPosition(FVector(x, y, z)) == EBlock::Air) continue;
 				
 				for (const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left, EDirection::Up, EDirection::Down })
 				{
-					FVector Position = FVector(x, y, z);
+					FVector Position(x, y, z);
 					if (CheckIsAir(GetPositionInDirection(Direction, Position)))
 					{
 						CreateFace(Direction, Position * FChunkData::BlockSize * FChunkData::BlockScale);
@@ -89,16 +89,29 @@ void AChunk::GenerateMesh()
 
 void AChunk::CreateFace(EDirection Direction, const FVector& Position)
 {
-	Verticies.Append(GetFaceVerticies(Direction, Position));
-	UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
-	Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
+	ChunkMeshData.Verticies.Append(GetFaceVerticies(Direction, Position));
+	ChunkMeshData.UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
+	ChunkMeshData.Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
 	VertexCount += 4;
+}
+
+TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Position) const
+{
+	TArray<FVector> FaceVerticies;
+
+	for (int i = 0; i < 4; i++)
+	{
+		// Get the verticies for the face by getting the index of the verticies from the triangle data
+		FVector Pos(Position.X, Position.Y, Position.Z);
+		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * FChunkData::BlockScale + Pos);
+	}
+
+	return FaceVerticies;
 }
 
 void AChunk::ApplyMesh() const
 {
-	Mesh->CreateMeshSection(0, Verticies, Triangles, TArray<FVector>(), UV, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
-	Mesh->AddCollisionConvexMesh(Verticies);
+	Mesh->CreateMeshSection(0, ChunkMeshData.Verticies, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
 }
 
 bool AChunk::CheckIsAir(const FVector& Position) const
@@ -108,9 +121,7 @@ bool AChunk::CheckIsAir(const FVector& Position) const
 
 void AChunk::RegenerateMesh()
 {
-	Verticies.Reset();
-	UV.Reset();
-	Triangles.Reset();
+	ChunkMeshData.Clear();
 	VertexCount = 0;
 	GenerateMesh();
 	ApplyMesh();
@@ -172,17 +183,60 @@ int AChunk::GetBlockIndex(int X, int Y, int Z) const
 	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkSize;
 }
 
-TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Position) const
+void AChunk::SpawnBlock(const FVector& LocalChunkBlockPosition, EBlock BlockType)
 {
-	TArray<FVector> FaceVerticies;
+	if (GetBlockAtPosition(LocalChunkBlockPosition) != EBlock::Air) return;
+	
+	SetBlockAtPosition(LocalChunkBlockPosition, BlockType);
 
-	for (int i = 0; i < 4; i++)
+	RegenerateMesh();
+}
+
+void AChunk::SetBlockAtPosition(const FVector& Position, EBlock BlockType)
+{
+	if (Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
+		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
+		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize)
 	{
-		// Get the verticies for the face by getting the index of the verticies from the triangle data
-		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * FChunkData::BlockScale + Position);
+		Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)] = BlockType;
 	}
+	else
+	{
+		if (!ParentWorld) return;
 
-	return FaceVerticies;
+		if (Position.Z < 0 || Position.Z >= FChunkData::ChunkSize) return;
+		
+		FVector2D AdjChunkPos = ChunkPosition;
+		FVector BlockPosition = Position;
+		
+		if (Position.X < 0)
+		{
+			AdjChunkPos.X -= 1;
+			BlockPosition.X += FChunkData::ChunkSize;
+		}
+		else if (Position.X >= FChunkData::ChunkSize)
+		{
+			AdjChunkPos.X += 1;
+			BlockPosition.X -= FChunkData::ChunkSize;
+		}
+		if (Position.Y < 0)
+		{
+			AdjChunkPos.Y -= 1;
+			BlockPosition.Y += FChunkData::ChunkSize;
+		}
+		else if (Position.Y >= FChunkData::ChunkSize)
+		{
+			AdjChunkPos.Y += 1;
+			BlockPosition.Y -= FChunkData::ChunkSize;
+		}
+
+		if (!ParentWorld->GetChunksData().Contains(AdjChunkPos)) return;
+		
+		AChunk* adjChunk = ParentWorld->GetChunksData()[AdjChunkPos];
+		if (!adjChunk) return;
+		
+		adjChunk->SpawnBlock(BlockPosition, BlockType);
+	}
 }
 
 FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Position) const
@@ -190,12 +244,12 @@ FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Posi
 	switch (Direction)
 	{
 	case EDirection::Forward: return Position + FVector::ForwardVector;
-	case EDirection::Right: return Position + FVector::RightVector;
 	case EDirection::Backward: return Position + FVector::BackwardVector;
-	case EDirection::Left: return Position + FVector::LeftVector;
-	case EDirection::Up: return Position + FVector::UpVector;
+	case EDirection::Right: return Position + FVector::RightVector;
+	case EDirection::Left:	return Position + FVector::LeftVector;
+	case EDirection::Up:	return Position + FVector::UpVector;
 	case EDirection::Down: return Position + FVector::DownVector;
-	default: throw std::invalid_argument("Invalid direction");	
+	default: throw std::invalid_argument("Invalid direction");
 	}
 }
 

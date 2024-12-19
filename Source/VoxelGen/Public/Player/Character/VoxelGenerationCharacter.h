@@ -26,11 +26,12 @@ public:
 
 protected:
 	virtual void BeginPlay();
-
 	
 	void Move(const FInputActionValue& Value);
 
 	void Look(const FInputActionValue& Value);
+
+	void SpawnBlock();
 
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
@@ -41,7 +42,6 @@ public:
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
 private:
-
 	/** Pawn mesh: 1st person view (arms; seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* Mesh1P;
@@ -60,6 +60,13 @@ private:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> LookAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> SpawnBlockAction;
+
+private:
+	UPROPERTY(EditAnywhere, Category = "Character")
+	float InteractionRange = 1000;
 
 };
 

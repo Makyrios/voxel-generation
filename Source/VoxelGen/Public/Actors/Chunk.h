@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ChunkMeshData.h"
 #include "GameFramework/Actor.h"
 #include "Chunk.generated.h"
 
@@ -26,25 +27,25 @@ public:
 	void RegenerateMesh();
 	
 	EBlock GetBlockAtPosition(const FVector& Position) const;
+	
+	void SpawnBlock(const FVector& ChunkWorldBlockPosition, EBlock BlockType);
 
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	void GenerateBlocks();
-
 	void GenerateMesh();
-
 	void ApplyMesh() const;
 
 	bool CheckIsAir(const FVector& Position) const;
 
 	void CreateFace(EDirection Direction, const FVector& Position);
-
 	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& Position) const;
 
+	void SetBlockAtPosition(const FVector& Position, EBlock BlockType);
+	
 	FVector GetPositionInDirection(EDirection Direction, const FVector& Position) const;
-
 	int GetBlockIndex(int X, int Y, int Z) const;
 
 public:
@@ -64,10 +65,7 @@ private:
 
 	TArray<EBlock> Blocks;
 
-	TArray<FVector> Verticies;
-	TArray<int> Triangles;
-	TArray<FVector2D> UV;
-
+	FChunkMeshData ChunkMeshData;
 	int VertexCount = 0;
 
 	const FVector BlockVerticies[8] = {
