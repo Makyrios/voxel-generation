@@ -8,4 +8,5 @@ void FChunkMeshData::Clear()
 	Vertices.Empty();
 	Triangles.Empty();
 	UV.Empty();
+	Colors.Empty();
 }

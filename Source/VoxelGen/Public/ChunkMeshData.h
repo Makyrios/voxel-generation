@@ -14,6 +14,7 @@ public:
 	TArray<FVector> Vertices;
 	TArray<int> Triangles;
 	TArray<FVector2D> UV;
+	TArray<FColor> Colors;
 
 public:
 	void Clear();

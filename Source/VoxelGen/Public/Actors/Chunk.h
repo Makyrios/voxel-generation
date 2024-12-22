@@ -29,6 +29,7 @@ public:
 	EBlock GetBlockAtPosition(const FVector& Position) const;
 	
 	void SpawnBlock(const FVector& LocalChunkBlockPosition, EBlock BlockType);
+	
 	void DestroyBlock(const FVector& LocalChunkBlockPosition);
 
 protected:
@@ -57,6 +58,8 @@ private:
 	void UpdateAdjacentChunk(const FVector& LocalEdgeBlockPosition) const;
 	TArray<FVector> GetEdgeOffsets(const FVector& LocalEdgeBlockPosition) const;
 
+	int GetTextureIndex(EBlock BlockType, EDirection Direction) const;
+
 public:
 	FVector2D ChunkPosition;
 	
@@ -68,6 +71,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	TObjectPtr<UFastNoiseWrapper> Noise;
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	TObjectPtr<UMaterial> Material;
 
 	UPROPERTY()
 	AChunkWorld* ParentWorld;

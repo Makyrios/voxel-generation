@@ -131,6 +131,6 @@ void AVoxelGenerationCharacter::SpawnBlock()
 		
 		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
 		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
-		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Stone);
+		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Dirt);
 	}
 }

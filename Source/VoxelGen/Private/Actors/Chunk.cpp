@@ -24,7 +24,10 @@ void AChunk::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
+	if (Noise)
+	{
+		Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
+	}
 	
 	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkSize);
 
@@ -53,7 +56,18 @@ void AChunk::GenerateBlocks()
 
 			for (int z = 0; z < Height; ++z)
 			{
-				SetBlockAtPosition(FVector(x, y, z), EBlock::Stone);
+				if (z < Height - 3)
+				{
+					SetBlockAtPosition(FVector(x, y, z), EBlock::Stone);
+				}
+				else if (z < Height - 1)
+				{
+					 SetBlockAtPosition(FVector(x, y, z), EBlock::Dirt);
+				}
+				else if (z == Height - 1)
+				{
+					SetBlockAtPosition(FVector(x, y, z), EBlock::Grass);
+				}
 			}
 
 			for (int z = Height; z < FChunkData::ChunkSize; ++z)
@@ -79,11 +93,20 @@ void AChunk::GenerateMesh()
 					FVector Position(x, y, z);
 					if (CheckIsAir(GetPositionInDirection(Direction, Position)))
 					{
-						CreateFace(Direction, Position * FChunkData::BlockSize * FChunkData::BlockScale);
+						CreateFace(Direction, Position);
 					}
 				}
 			}
 		}
+	}
+}
+
+void AChunk::ApplyMesh() const
+{
+	Mesh->CreateMeshSection(0, ChunkMeshData.Vertices, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, ChunkMeshData.Colors, TArray<FProcMeshTangent>(), true);
+	if (Material)
+	{
+		Mesh->SetMaterial(0, Material);
 	}
 }
 
@@ -103,10 +126,28 @@ FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Posi
 
 void AChunk::CreateFace(EDirection Direction, const FVector& Position)
 {
-	ChunkMeshData.Vertices.Append(GetFaceVerticies(Direction, Position));
-	ChunkMeshData.UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
+	ChunkMeshData.Vertices.Append(GetFaceVerticies(Direction, Position * FChunkData::BlockSize * FChunkData::BlockScale));
+	ChunkMeshData.UV.Append({ FVector2D(1, 0), FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1) });
 	ChunkMeshData.Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
+
+	const int TextureIndex = GetTextureIndex(GetBlockAtPosition(Position), Direction);
+	const FColor Color(0, 0, 0, TextureIndex);
+	ChunkMeshData.Colors.Append({Color, Color, Color, Color});
 	VertexCount += 4;
+}
+
+int AChunk::GetTextureIndex(EBlock BlockType, EDirection Direction) const
+{
+	switch (BlockType)
+	{
+	case EBlock::Grass:
+		if (Direction == EDirection::Up) return 0;
+		if (Direction == EDirection::Down) return 2;
+		return 1;
+	case EBlock::Dirt: return 2;
+	case EBlock::Stone: return 3;
+	default: return 255;
+	}
 }
 
 TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Position) const
@@ -121,11 +162,6 @@ TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Po
 	}
 
 	return FaceVerticies;
-}
-
-void AChunk::ApplyMesh() const
-{
-	Mesh->CreateMeshSection(0, ChunkMeshData.Vertices, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
 }
 
 bool AChunk::CheckIsAir(const FVector& Position) const
