@@ -5,7 +5,7 @@
 
 void FChunkMeshData::Clear()
 {
-	Verticies.Empty();
+	Vertices.Empty();
 	Triangles.Empty();
 	UV.Empty();
 }

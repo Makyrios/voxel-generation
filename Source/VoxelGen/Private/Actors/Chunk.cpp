@@ -53,12 +53,12 @@ void AChunk::GenerateBlocks()
 
 			for (int z = 0; z < Height; ++z)
 			{
-				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
+				SetBlockAtPosition(FVector(x, y, z), EBlock::Stone);
 			}
 
 			for (int z = Height; z < FChunkData::ChunkSize; ++z)
 			{
-				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
+				SetBlockAtPosition(FVector(x, y, z), EBlock::Air);
 			}
 		}
 	}
@@ -87,9 +87,23 @@ void AChunk::GenerateMesh()
 	}
 }
 
+FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Position) const
+{
+	switch (Direction)
+	{
+	case EDirection::Forward: return Position + FVector::ForwardVector;
+	case EDirection::Backward: return Position + FVector::BackwardVector;
+	case EDirection::Right: return Position + FVector::RightVector;
+	case EDirection::Left:	return Position + FVector::LeftVector;
+	case EDirection::Up:	return Position + FVector::UpVector;
+	case EDirection::Down: return Position + FVector::DownVector;
+	default: throw std::invalid_argument("Invalid direction");
+	}
+}
+
 void AChunk::CreateFace(EDirection Direction, const FVector& Position)
 {
-	ChunkMeshData.Verticies.Append(GetFaceVerticies(Direction, Position));
+	ChunkMeshData.Vertices.Append(GetFaceVerticies(Direction, Position));
 	ChunkMeshData.UV.Append({ FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0) });
 	ChunkMeshData.Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
 	VertexCount += 4;
@@ -111,7 +125,7 @@ TArray<FVector> AChunk::GetFaceVerticies(EDirection Direction, const FVector& Po
 
 void AChunk::ApplyMesh() const
 {
-	Mesh->CreateMeshSection(0, ChunkMeshData.Verticies, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	Mesh->CreateMeshSection(0, ChunkMeshData.Vertices, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
 }
 
 bool AChunk::CheckIsAir(const FVector& Position) const
@@ -129,49 +143,121 @@ void AChunk::RegenerateMesh()
 
 EBlock AChunk::GetBlockAtPosition(const FVector& Position) const
 {
-	if (Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
-		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
-		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize)
+	if (IsWithinChunkBounds(Position))
 	{
 		return Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)];
 	}
 	else
 	{
-		if (!ParentWorld) return EBlock::Air;
-
-		if (Position.Z < 0 || Position.Z >= FChunkData::ChunkSize) return EBlock::Air;
-		
-		FVector2D AdjChunkPos = ChunkPosition;
-		FVector BlockPosition = Position;
-		
-		if (Position.X < 0)
+		FVector AdjBlockPosition;
+		if (AChunk* AdjChunk = GetAdjacentChunk(Position, &AdjBlockPosition))
 		{
-			AdjChunkPos.X -= 1;
-			BlockPosition.X += FChunkData::ChunkSize;
+			return AdjChunk->GetBlockAtPosition(AdjBlockPosition);
 		}
-		else if (Position.X >= FChunkData::ChunkSize)
-		{
-			AdjChunkPos.X += 1;
-			BlockPosition.X -= FChunkData::ChunkSize;
-		}
-		if (Position.Y < 0)
-		{
-			AdjChunkPos.Y -= 1;
-			BlockPosition.Y += FChunkData::ChunkSize;
-		}
-		else if (Position.Y >= FChunkData::ChunkSize)
-		{
-			AdjChunkPos.Y += 1;
-			BlockPosition.Y -= FChunkData::ChunkSize;
-		}
-
-		if (!ParentWorld->GetChunksData().Contains(AdjChunkPos)) return EBlock::Air;
-		
-		AChunk* adjChunk = ParentWorld->GetChunksData()[AdjChunkPos];
-		if (!adjChunk) return EBlock::Air;
-		
-		return adjChunk->GetBlockAtPosition(BlockPosition);
 	}
+	return EBlock::Air;
+}
+
+AChunk* AChunk::GetAdjacentChunk(const FVector& Position, FVector* const outAdjChunkBlockPosition) const
+{
+	if (!ParentWorld || !IsWithinVerticalBounds(Position)) return nullptr;
+
+	FVector2D AdjChunkPos;
+	FVector BlockPosition;
+	if (!AdjustForAdjacentChunk(Position, AdjChunkPos, BlockPosition)) return nullptr;
+
+	if (outAdjChunkBlockPosition)
+	{
+		*outAdjChunkBlockPosition = BlockPosition;
+	}
+	
+	if (ParentWorld->GetChunksData().Contains(AdjChunkPos))
+	{
+		return ParentWorld->GetChunksData().FindRef(AdjChunkPos);
+	}
+	return nullptr;
+}
+
+void AChunk::SetBlockAtPosition(const FVector& Position, EBlock BlockType)
+{
+	if (IsWithinChunkBounds(Position))
+	{
+		Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)] = BlockType;
+
+		// Update the adjacent chunk only when destroying block
+		// to prevent updating the whole chunk mesh when spawning a block
+		if (BlockType == EBlock::Air)
+		{
+			UpdateAdjacentChunk(Position);
+		}
+	}
+	else
+	{
+		FVector AdjChunkBlockPosition;
+		if (AChunk* AdjChunk = GetAdjacentChunk(Position, &AdjChunkBlockPosition))
+		{
+			AdjChunk->SpawnBlock(AdjChunkBlockPosition, BlockType);
+		}
+	}
+}
+
+void AChunk::UpdateAdjacentChunk(const FVector& LocalEdgeBlockPosition) const
+{
+	for (const auto& Offset : GetEdgeOffsets(LocalEdgeBlockPosition))
+	{
+		FVector AdjBlockPosition = LocalEdgeBlockPosition + Offset;
+		if (AChunk* AdjacentChunk = GetAdjacentChunk(AdjBlockPosition))
+		{
+			AdjacentChunk->RegenerateMesh();
+		}
+	}
+}
+
+TArray<FVector> AChunk::GetEdgeOffsets(const FVector& LocalEdgeBlockPosition) const
+{
+	TArray<FVector> Offsets;
+	if (LocalEdgeBlockPosition.X == 0)
+		Offsets.Add(FVector(-1, 0, 0));
+	else if (LocalEdgeBlockPosition.X == FChunkData::ChunkSize - 1)
+		Offsets.Add(FVector(1, 0, 0));
+
+	if (LocalEdgeBlockPosition.Y == 0)
+		Offsets.Add(FVector(0, -1, 0));
+	else if (LocalEdgeBlockPosition.Y == FChunkData::ChunkSize - 1)
+		Offsets.Add(FVector(0, 1, 0));
+
+	return Offsets;
+}
+
+bool AChunk::AdjustForAdjacentChunk(const FVector& Position, FVector2D& AdjChunkPosition, FVector& AdjBlockPosition) const
+{
+	if (!IsWithinVerticalBounds(Position)) return false;
+
+	AdjChunkPosition = ChunkPosition;
+	AdjBlockPosition = Position;
+
+	if (Position.X < 0)
+	{
+		AdjChunkPosition.X -= 1;
+		AdjBlockPosition.X += FChunkData::ChunkSize;
+	}
+	else if (Position.X >= FChunkData::ChunkSize)
+	{
+		AdjChunkPosition.X += 1;
+		AdjBlockPosition.X -= FChunkData::ChunkSize;
+	}
+	if (Position.Y < 0)
+	{
+		AdjChunkPosition.Y -= 1;
+		AdjBlockPosition.Y += FChunkData::ChunkSize;
+	}
+	else if (Position.Y >= FChunkData::ChunkSize)
+	{
+		AdjChunkPosition.Y += 1;
+		AdjBlockPosition.Y -= FChunkData::ChunkSize;
+	}
+
+	return true;
 }
 
 int AChunk::GetBlockIndex(int X, int Y, int Z) const
@@ -183,73 +269,35 @@ int AChunk::GetBlockIndex(int X, int Y, int Z) const
 	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkSize;
 }
 
+bool AChunk::IsWithinChunkBounds(const FVector& Position) const
+{
+	return Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
+		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
+		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize;
+}
+
+bool AChunk::IsWithinVerticalBounds(const FVector& Position) const
+{
+	return Position.Z >= 0 && Position.Z < FChunkData::ChunkSize;
+}
+
 void AChunk::SpawnBlock(const FVector& LocalChunkBlockPosition, EBlock BlockType)
 {
 	if (GetBlockAtPosition(LocalChunkBlockPosition) != EBlock::Air) return;
 	
 	SetBlockAtPosition(LocalChunkBlockPosition, BlockType);
 
+	if (IsWithinChunkBounds(LocalChunkBlockPosition))
+	{
+		RegenerateMesh();
+	}
+}
+
+void AChunk::DestroyBlock(const FVector& LocalChunkBlockPosition)
+{
+	if (!IsWithinChunkBounds(LocalChunkBlockPosition)) return;
+
+	SetBlockAtPosition(LocalChunkBlockPosition, EBlock::Air);
+
 	RegenerateMesh();
 }
-
-void AChunk::SetBlockAtPosition(const FVector& Position, EBlock BlockType)
-{
-	if (Position.X >= 0 && Position.X < FChunkData::ChunkSize &&
-		Position.Y >= 0 && Position.Y < FChunkData::ChunkSize &&
-		Position.Z >= 0 && Position.Z < FChunkData::ChunkSize)
-	{
-		Blocks[GetBlockIndex(Position.X, Position.Y, Position.Z)] = BlockType;
-	}
-	else
-	{
-		if (!ParentWorld) return;
-
-		if (Position.Z < 0 || Position.Z >= FChunkData::ChunkSize) return;
-		
-		FVector2D AdjChunkPos = ChunkPosition;
-		FVector BlockPosition = Position;
-		
-		if (Position.X < 0)
-		{
-			AdjChunkPos.X -= 1;
-			BlockPosition.X += FChunkData::ChunkSize;
-		}
-		else if (Position.X >= FChunkData::ChunkSize)
-		{
-			AdjChunkPos.X += 1;
-			BlockPosition.X -= FChunkData::ChunkSize;
-		}
-		if (Position.Y < 0)
-		{
-			AdjChunkPos.Y -= 1;
-			BlockPosition.Y += FChunkData::ChunkSize;
-		}
-		else if (Position.Y >= FChunkData::ChunkSize)
-		{
-			AdjChunkPos.Y += 1;
-			BlockPosition.Y -= FChunkData::ChunkSize;
-		}
-
-		if (!ParentWorld->GetChunksData().Contains(AdjChunkPos)) return;
-		
-		AChunk* adjChunk = ParentWorld->GetChunksData()[AdjChunkPos];
-		if (!adjChunk) return;
-		
-		adjChunk->SpawnBlock(BlockPosition, BlockType);
-	}
-}
-
-FVector AChunk::GetPositionInDirection(EDirection Direction, const FVector& Position) const
-{
-	switch (Direction)
-	{
-	case EDirection::Forward: return Position + FVector::ForwardVector;
-	case EDirection::Backward: return Position + FVector::BackwardVector;
-	case EDirection::Right: return Position + FVector::RightVector;
-	case EDirection::Left:	return Position + FVector::LeftVector;
-	case EDirection::Up:	return Position + FVector::UpVector;
-	case EDirection::Down: return Position + FVector::DownVector;
-	default: throw std::invalid_argument("Invalid direction");
-	}
-}
-

@@ -28,7 +28,8 @@ public:
 	
 	EBlock GetBlockAtPosition(const FVector& Position) const;
 	
-	void SpawnBlock(const FVector& ChunkWorldBlockPosition, EBlock BlockType);
+	void SpawnBlock(const FVector& LocalChunkBlockPosition, EBlock BlockType);
+	void DestroyBlock(const FVector& LocalChunkBlockPosition);
 
 protected:
 	virtual void BeginPlay() override;
@@ -37,16 +38,24 @@ private:
 	void GenerateBlocks();
 	void GenerateMesh();
 	void ApplyMesh() const;
-
-	bool CheckIsAir(const FVector& Position) const;
-
 	void CreateFace(EDirection Direction, const FVector& Position);
 	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& Position) const;
-
-	void SetBlockAtPosition(const FVector& Position, EBlock BlockType);
-	
 	FVector GetPositionInDirection(EDirection Direction, const FVector& Position) const;
+	
+	bool CheckIsAir(const FVector& Position) const;
+	
+	void SetBlockAtPosition(const FVector& Position, EBlock BlockType);
 	int GetBlockIndex(int X, int Y, int Z) const;
+	
+	AChunk* GetAdjacentChunk(const FVector& Position, FVector* const outAdjChunkBlockPosition = nullptr) const;
+	bool AdjustForAdjacentChunk(const FVector& Position, FVector2D& AdjChunkPosition, FVector& AdjBlockPosition) const;
+
+	bool IsWithinChunkBounds(const FVector& Position) const;
+	bool IsWithinVerticalBounds(const FVector& Position) const;
+
+	// Update the adjacent chunk if the block is on the edge of the chunk
+	void UpdateAdjacentChunk(const FVector& LocalEdgeBlockPosition) const;
+	TArray<FVector> GetEdgeOffsets(const FVector& LocalEdgeBlockPosition) const;
 
 public:
 	FVector2D ChunkPosition;

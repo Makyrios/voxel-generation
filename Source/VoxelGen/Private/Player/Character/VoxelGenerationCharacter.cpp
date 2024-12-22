@@ -56,6 +56,8 @@ void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* Playe
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Look);
 
 		EnhancedInputComponent->BindAction(SpawnBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::SpawnBlock);
+
+		EnhancedInputComponent->BindAction(DestroyBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::DestroyBlock);
 	}
 }
 
@@ -82,6 +84,29 @@ void AVoxelGenerationCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
+void AVoxelGenerationCharacter::DestroyBlock()
+{
+	FHitResult HitResult;
+	FVector TraceStart = FirstPersonCameraComponent->GetComponentLocation();
+	FVector TraceEnd = TraceStart + FirstPersonCameraComponent->GetForwardVector() * InteractionRange;
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+	if (!bHit) return;
+
+	if (AChunk* Chunk = Cast<AChunk>(HitResult.GetActor()))
+	{
+		const FVector& HitLocation = HitResult.Location;
+		const FVector& ImpactNormal = HitResult.ImpactNormal;
+		
+		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
+		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
+		FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
+		
+		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition);
+		Chunk->DestroyBlock(LocalChunkBlockPosition);
+	}
+}
+
 void AVoxelGenerationCharacter::SpawnBlock()
 {
 	FHitResult HitResult;
@@ -91,19 +116,19 @@ void AVoxelGenerationCharacter::SpawnBlock()
 	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
 	if (!bHit) return;
 
-	const FVector& HitLocation = HitResult.Location;
-	const FVector& ImpactNormal = HitResult.ImpactNormal;
-	float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
-
-	FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
-
-	FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
-
-	FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
-	FVector WorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(SpawnBlockPosition);
-	
 	if (AChunk* Chunk = Cast<AChunk>(HitResult.GetActor()))
 	{
+		const FVector& HitLocation = HitResult.Location;
+		const FVector& ImpactNormal = HitResult.ImpactNormal;
+		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
+
+		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
+
+		FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
+
+		FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
+		FVector WorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(SpawnBlockPosition);
+		
 		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
 		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
 		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Stone);

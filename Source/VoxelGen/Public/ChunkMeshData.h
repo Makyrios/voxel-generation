@@ -11,7 +11,7 @@ struct VOXELGEN_API FChunkMeshData
 	GENERATED_BODY()
 
 public:
-	TArray<FVector> Verticies;
+	TArray<FVector> Vertices;
 	TArray<int> Triangles;
 	TArray<FVector2D> UV;
 

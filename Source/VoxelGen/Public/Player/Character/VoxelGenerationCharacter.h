@@ -31,6 +31,7 @@ protected:
 
 	void Look(const FInputActionValue& Value);
 
+	void DestroyBlock();
 	void SpawnBlock();
 
 protected:
@@ -63,6 +64,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> SpawnBlockAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> DestroyBlockAction;
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Character")
