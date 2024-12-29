@@ -28,7 +28,6 @@ AVoxelGenerationCharacter::AVoxelGenerationCharacter()
 	Mesh1P->bCastDynamicShadow = false;
 	Mesh1P->CastShadow = false;
 	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
-
 }
 
 void AVoxelGenerationCharacter::BeginPlay()
@@ -100,9 +99,9 @@ void AVoxelGenerationCharacter::DestroyBlock()
 		
 		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
 		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
-		FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(InteractedBlockPosition);
 		
-		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition);
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition);
 		Chunk->DestroyBlock(LocalChunkBlockPosition);
 	}
 }
@@ -121,16 +120,18 @@ void AVoxelGenerationCharacter::SpawnBlock()
 		const FVector& HitLocation = HitResult.Location;
 		const FVector& ImpactNormal = HitResult.ImpactNormal;
 		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
-
+		
 		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
-
 		FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
 
-		FVector InteractedWorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(InteractedBlockPosition);
-		FVector WorldBlockPosition = FChunkData::ConvertToWorldBlockPosition(SpawnBlockPosition);
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(InteractedBlockPosition);
+		FIntVector WorldBlockPosition = FChunkData::GetWorldBlockPosition(SpawnBlockPosition);
+
+		UE_LOG(LogTemp, Warning, TEXT("InteractedWorldBlockPosition: %s"), *InteractedWorldBlockPosition.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("WorldBlockPosition: %s"), *WorldBlockPosition.ToString());
 		
 		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
-		FVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
 		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Dirt);
 	}
 }

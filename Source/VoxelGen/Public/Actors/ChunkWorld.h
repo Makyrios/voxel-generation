@@ -7,6 +7,7 @@
 #include "ChunkWorld.generated.h"
 
 class AChunk;
+class AVoxelGenerationCharacter;
 
 UCLASS()
 class VOXELGEN_API AChunkWorld : public AActor
@@ -15,22 +16,45 @@ class VOXELGEN_API AChunkWorld : public AActor
 	
 public:	
 	AChunkWorld();
+	
+	void InitializeWorld();
 
-	const TMap<FVector2D, AChunk*>& GetChunksData() { return ChunksData; }
+	const TMap<FIntVector2, AChunk*>& GetChunksData() { return ChunksData; }
 
 protected:
 	virtual void BeginPlay() override;
 
 private:
-	void CreateChunks();
+	// Create and load chunks to array
+	void UpdateChunks();
+
+	// Async mesh generation in a queue
+	void ProcessChunksGeneration(const float DeltaTime);
+
+	bool IsPlayerChunkUpdated();
+
+	AChunk* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
 
 public:
 	virtual void Tick(float DeltaTime) override;
 
 private:
-	TMap<FVector2D, AChunk*> ChunksData;
+	TMap<FIntVector2, AChunk*> ChunksData;
+	TQueue<AChunk*> ChunkGenerationQueue;
+	
+	UPROPERTY(EditAnywhere, Category = "Chunk World")
+	float SpawnChunkDelay = 0.02f;
+	float CurrentSpawnChunkDelay = SpawnChunkDelay;
+	
+	FIntVector2 CurrentPlayerChunk;
+	
+	UPROPERTY()
+	AVoxelGenerationCharacter* PlayerCharacter;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Chunk World")
 	TSubclassOf<AChunk> ChunkClass;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk World")
+	int DrawDistance = 5;
 	
 };

@@ -21,16 +21,19 @@ class VOXELGEN_API AChunk : public AActor
 	
 public:
 	AChunk();
-
-	void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
-
+	
+	void InitializeChunk();
+	
 	void RegenerateMesh();
+	void RegenerateMeshAsync();
 	
-	EBlock GetBlockAtPosition(const FVector& Position) const;
+	void SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType);
 	
-	void SpawnBlock(const FVector& LocalChunkBlockPosition, EBlock BlockType);
+	void DestroyBlock(const FIntVector& LocalChunkBlockPosition);
 	
-	void DestroyBlock(const FVector& LocalChunkBlockPosition);
+	void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
+	
+	EBlock GetBlockAtPosition(const FIntVector& Position) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -38,41 +41,44 @@ protected:
 private:
 	void GenerateBlocks();
 	void GenerateMesh();
-	void ApplyMesh() const;
-	void CreateFace(EDirection Direction, const FVector& Position);
-	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& Position) const;
-	FVector GetPositionInDirection(EDirection Direction, const FVector& Position) const;
+	void ApplyMesh();
+	void CreateFace(EDirection Direction, const FIntVector& Position);
+	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& WorldPosition) const;
+	FIntVector GetPositionInDirection(EDirection Direction, const FIntVector& Position) const;
 	
-	bool CheckIsAir(const FVector& Position) const;
+	bool CheckIsAir(const FIntVector& Position) const;
 	
-	void SetBlockAtPosition(const FVector& Position, EBlock BlockType);
+	void SetBlockAtPosition(const FIntVector& Position, EBlock BlockType);
 	int GetBlockIndex(int X, int Y, int Z) const;
 	
-	AChunk* GetAdjacentChunk(const FVector& Position, FVector* const outAdjChunkBlockPosition = nullptr) const;
-	bool AdjustForAdjacentChunk(const FVector& Position, FVector2D& AdjChunkPosition, FVector& AdjBlockPosition) const;
+	AChunk* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
+	bool AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& AdjChunkPosition, FIntVector& AdjBlockPosition) const;
 
-	bool IsWithinChunkBounds(const FVector& Position) const;
-	bool IsWithinVerticalBounds(const FVector& Position) const;
+	bool IsWithinChunkBounds(const FIntVector& Position) const;
+	bool IsWithinVerticalBounds(const FIntVector& Position) const;
 
-	// Update the adjacent chunk if the block is on the edge of the chunk
-	void UpdateAdjacentChunk(const FVector& LocalEdgeBlockPosition) const;
-	TArray<FVector> GetEdgeOffsets(const FVector& LocalEdgeBlockPosition) const;
+	// Update the adjacent chunk if the block is at the edge of the chunk
+	void UpdateAdjacentChunk(const FIntVector& LocalEdgeBlockPosition) const;
+	TArray<FIntVector> GetEdgeOffsets(const FIntVector& LocalEdgeBlockPosition) const;
 
 	int GetTextureIndex(EBlock BlockType, EDirection Direction) const;
 
 public:
-	FVector2D ChunkPosition;
-	
-protected:
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.03;
+	FIntVector2 ChunkPosition;
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	TObjectPtr<UFastNoiseWrapper> Noise;
+
+	bool bIsMeshInitialized = false;
+	bool bCanChangeBlocks = true;
+	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TObjectPtr<UMaterial> Material;
+	
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	float Frequency = 0.03;
 
 	UPROPERTY()
 	AChunkWorld* ParentWorld;
