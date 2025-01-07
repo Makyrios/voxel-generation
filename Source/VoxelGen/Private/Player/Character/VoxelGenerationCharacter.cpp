@@ -8,7 +8,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Actors/Chunk.h"
-#include "Objects/ChunkData.h"
+#include "Structs/ChunkData.h"
 #include "VoxelGen/Enums.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);

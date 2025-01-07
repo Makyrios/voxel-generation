@@ -4,7 +4,7 @@
 #include "Actors/ChunkWorld.h"
 #include "Actors/Chunk.h"
 #include "Kismet/GameplayStatics.h"
-#include "Objects/ChunkData.h"
+#include "Structs/ChunkData.h"
 #include "Player/Character/VoxelGenerationCharacter.h"
 
 AChunkWorld::AChunkWorld()
@@ -39,7 +39,7 @@ void AChunkWorld::Tick(float DeltaTime)
 
 void AChunkWorld::UpdateChunks()
 {
-	if (!IsPlayerChunkUpdated()) return;
+	if (!IsPlayerChunkUpdated() && !UGameplayStatics::IsGamePaused(GetWorld())) return;
 
 	for (int x = CurrentPlayerChunk.X - DrawDistance; x < CurrentPlayerChunk.X + DrawDistance; ++x)
 	{
@@ -50,27 +50,6 @@ void AChunkWorld::UpdateChunks()
 			AChunk* LoadedChunk = LoadChunkAtPosition(FIntVector2(x, y));
 			ChunkGenerationQueue.Enqueue(LoadedChunk);
 		}
-	}
-}
-
-void AChunkWorld::ProcessChunksGeneration(const float DeltaTime)
-{
-	CurrentSpawnChunkDelay -= DeltaTime;
-
-	if (CurrentSpawnChunkDelay <= 0.f && !ChunkGenerationQueue.IsEmpty())
-	{
-		AChunk* Chunk = nullptr;
-		if (ChunkGenerationQueue.Dequeue(Chunk))
-		{
-			Chunk->RegenerateMeshAsync();
-		}
-		CurrentSpawnChunkDelay = SpawnChunkDelay;
-	}
-
-	// Unpause the game when all chunks are loaded
-	if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunkGenerationQueue.IsEmpty())
-	{
-		UGameplayStatics::SetGamePaused(GetWorld(), false);
 	}
 }
 
@@ -96,6 +75,7 @@ AChunk* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
     
 	AChunk* Chunk = GetWorld()->SpawnActor<AChunk>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
 	Chunk->ChunkPosition = ChunkCoordinates;
+	Chunk->GenerateBlocks(ChunkWorldPosition);
 	Chunk->SetParentWorld(this);
 	ChunksData.Add(ChunkCoordinates, Chunk);
 
@@ -103,4 +83,25 @@ AChunk* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 	Chunk->InitializeChunk();
 	
 	return Chunk;
+}
+
+void AChunkWorld::ProcessChunksGeneration(const float DeltaTime)
+{
+	CurrentSpawnChunkDelay -= DeltaTime;
+
+	if (CurrentSpawnChunkDelay <= 0.f && !ChunkGenerationQueue.IsEmpty())
+	{
+		AChunk* Chunk = nullptr;
+		if (ChunkGenerationQueue.Dequeue(Chunk))
+		{
+			Chunk->RegenerateMeshAsync();
+		}
+		CurrentSpawnChunkDelay = SpawnChunkDelay;
+	}
+
+	// Unpause the game when all chunks are loaded
+	if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunkGenerationQueue.IsEmpty())
+	{
+		UGameplayStatics::SetGamePaused(GetWorld(), false);
+	}
 }

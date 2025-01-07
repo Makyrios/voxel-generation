@@ -3,13 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ChunkMeshData.generated.h"
 
-USTRUCT()
-struct VOXELGEN_API FChunkMeshData
+struct FChunkMeshData
 {
-	GENERATED_BODY()
-
 public:
 	TArray<FVector> Vertices;
 	TArray<int> Triangles;

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ChunkMeshData.h"
+#include "Structs/ChunkMeshData.h"
 #include "GameFramework/Actor.h"
 #include "Chunk.generated.h"
 
@@ -11,6 +11,7 @@ enum class EDirection;
 enum class EBlock;
 
 class UProceduralMeshComponent;
+class UTerrainGenerator;
 class UFastNoiseWrapper;
 class AChunkWorld;
 
@@ -26,6 +27,8 @@ public:
 	
 	void RegenerateMesh();
 	void RegenerateMeshAsync();
+
+	void GenerateBlocks(const FVector& ChunkWorldPosition);
 	
 	void SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType);
 	
@@ -39,7 +42,6 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	void GenerateBlocks();
 	void GenerateMesh();
 	void ApplyMesh();
 	void CreateFace(EDirection Direction, const FIntVector& Position);
@@ -67,9 +69,10 @@ public:
 	FIntVector2 ChunkPosition;
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Components")
+	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
-	TObjectPtr<UFastNoiseWrapper> Noise;
+	UPROPERTY(EditAnywhere, Category = "Components")
+	TObjectPtr<UTerrainGenerator> TerrainGenerator;
 
 	bool bIsMeshInitialized = false;
 	bool bCanChangeBlocks = true;

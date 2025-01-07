@@ -25,10 +25,8 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	// Create and load chunks to array
 	void UpdateChunks();
 
-	// Async mesh generation in a queue
 	void ProcessChunksGeneration(const float DeltaTime);
 
 	bool IsPlayerChunkUpdated();

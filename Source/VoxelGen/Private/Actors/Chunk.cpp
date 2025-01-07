@@ -6,8 +6,9 @@
 #include "ProceduralMeshComponent.h"
 #include "FastNoiseWrapper.h"
 #include "Actors/ChunkWorld.h"
-#include "Objects/ChunkData.h"
+#include "Structs/ChunkData.h"
 #include "Objects/FChunkMeshLoaderAsync.h"
+#include "Objects/TerrainGenerator.h"
 #include "VoxelGen/Enums.h"
 
 AChunk::AChunk()
@@ -18,7 +19,7 @@ AChunk::AChunk()
 	Mesh->SetCastShadow(false);
 	SetRootComponent(Mesh);
 	
-	Noise = CreateDefaultSubobject<UFastNoiseWrapper>("Noise");
+	TerrainGenerator = CreateDefaultSubobject<UTerrainGenerator>("TerrainGenerator");
 }
 
 void AChunk::BeginPlay()
@@ -28,56 +29,14 @@ void AChunk::BeginPlay()
 
 void AChunk::InitializeChunk()
 {
-	if (Noise)
-	{
-		Noise->SetupFastNoise(EFastNoise_NoiseType::Perlin, 1337, Frequency, EFastNoise_Interp::Quintic, EFastNoise_FractalType::FBM);
-	}
-	
 	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkSize);
-	
-	GenerateBlocks();
 }
 
-void AChunk::GenerateBlocks()
+void AChunk::GenerateBlocks(const FVector& ChunkWorldPosition)
 {
-	if (!Noise) return;
-	
-	const FVector Location = GetActorLocation();
+	if (!TerrainGenerator) return;
 
-	for (int x = 0; x < FChunkData::ChunkSize; ++x)
-	{
-		for (int y = 0; y < FChunkData::ChunkSize; ++y)
-		{
-			const float XPos = (x * FChunkData::BlockScaledSize + Location.X) / (FChunkData::BlockScaledSize);
-			const float YPos = (y * FChunkData::BlockScaledSize + Location.Y) / (FChunkData::BlockScaledSize);
-
-			// Get the height of the block at the current x and y position by getting the noise value at the x and y position and then scaling it to the chunk height
-			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise2D(XPos, YPos) + 1) * FChunkData::ChunkSize * FChunkData::BlockScale / 2), 0, FChunkData::ChunkSize);
-
-			for (int z = 0; z < FChunkData::ChunkSize; ++z)
-			{
-				EBlock BlockType = EBlock::Air;
-				// Chunk layers:
-				// Air
-				// Grass
-				// Dirt
-				// Stone
-				if (z < Height - 3)
-				{
-					BlockType = EBlock::Stone;
-				}
-				else if (z < Height - 1)
-				{
-					BlockType = EBlock::Dirt;
-				}
-				else if (z == Height - 1)
-				{
-					BlockType = EBlock::Grass;
-				}
-				SetBlockAtPosition(FIntVector(x, y, z), BlockType);
-			}
-		}
-	}
+	Blocks = TerrainGenerator->GenerateTerrain(ChunkWorldPosition);
 }
 
 void AChunk::GenerateMesh()
@@ -107,7 +66,6 @@ void AChunk::GenerateMesh()
 
 void AChunk::ApplyMesh()
 {
-	// Queue the mesh update on the game thread
 	AsyncTask(ENamedThreads::GameThread, [&]()
 	{
 		if (!Mesh) return;

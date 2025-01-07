@@ -12,9 +12,9 @@ struct FChunkData
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 ChunkSize = 16;
+	static constexpr int32 ChunkSize = 32;
 	static constexpr float BlockSize = 100.f;
-	static constexpr float BlockScale = 0.5f;
+	static constexpr float BlockScale = 0.25f;
 	static constexpr float BlockScaledSize = BlockSize * BlockScale;
 	static constexpr int32 WorldSizeInChunks = 500;
 
