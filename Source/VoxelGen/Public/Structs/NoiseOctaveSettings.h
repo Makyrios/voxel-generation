@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "FastNoiseWrapper.h"
-#include "VoxelGen/Enums.h"
 #include "NoiseOctaveSettings.generated.h"
 
 enum class EFastNoise_NoiseType : uint8;

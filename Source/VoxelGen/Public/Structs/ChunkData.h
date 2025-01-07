@@ -12,13 +12,24 @@ struct FChunkData
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 ChunkSize = 32;
+	static constexpr int32 ChunkSize = 16;
+	static constexpr int32 ChunkSizeSq = ChunkSize * ChunkSize;
+	static constexpr int32 ChunkHeight = 128;
 	static constexpr float BlockSize = 100.f;
 	static constexpr float BlockScale = 0.25f;
 	static constexpr float BlockScaledSize = BlockSize * BlockScale;
 	static constexpr int32 WorldSizeInChunks = 500;
 
 public:
+	static int32 GetBlockIndex(int32 X, int32 Y, int32 Z)
+	{
+		if (X < 0 || X >= ChunkSize || Y < 0 || Y >= ChunkSize || Z < 0 || Z >= ChunkHeight)
+		{
+			return -1;
+		}
+		return X + (Y * ChunkSize) + (Z * ChunkSizeSq);
+	}
+	
 	static FIntVector GetLocalBlockPosition(const FIntVector& WorldBlockPosition)
 	{
 		return FIntVector(

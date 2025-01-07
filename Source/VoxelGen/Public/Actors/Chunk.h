@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Structs/ChunkMeshData.h"
 #include "GameFramework/Actor.h"
+#include "Structs/ChunkData.h"
 #include "Chunk.generated.h"
 
 enum class EDirection;
@@ -22,8 +23,6 @@ class VOXELGEN_API AChunk : public AActor
 	
 public:
 	AChunk();
-	
-	void InitializeChunk();
 	
 	void RegenerateMesh();
 	void RegenerateMeshAsync();
@@ -51,7 +50,7 @@ private:
 	bool CheckIsAir(const FIntVector& Position) const;
 	
 	void SetBlockAtPosition(const FIntVector& Position, EBlock BlockType);
-	int GetBlockIndex(int X, int Y, int Z) const;
+	// int GetBlockIndex(int X, int Y, int Z) const;
 	
 	AChunk* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
 	bool AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& AdjChunkPosition, FIntVector& AdjBlockPosition) const;
@@ -92,13 +91,13 @@ private:
 	int VertexCount = 0;
 
 	const FVector BlockVerticies[8] = {
-		FVector(100,100,100),
-		FVector(100,0,100),
-		FVector(100,0,0),
-		FVector(100,100,0),
-		FVector(0,0,100),
-		FVector(0,100,100),
-		FVector(0,100,0),
+		FVector(FChunkData::BlockSize,FChunkData::BlockSize,FChunkData::BlockSize),
+		FVector(FChunkData::BlockSize,0,FChunkData::BlockSize),
+		FVector(FChunkData::BlockSize,0,0),
+		FVector(FChunkData::BlockSize,FChunkData::BlockSize,0),
+		FVector(0,0,FChunkData::BlockSize),
+		FVector(0,FChunkData::BlockSize,FChunkData::BlockSize),
+		FVector(0,FChunkData::BlockSize,0),
 		FVector(0,0,0)
 	};
 	

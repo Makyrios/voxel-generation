@@ -13,6 +13,13 @@ AChunkWorld::AChunkWorld()
 	
 }
 
+void AChunkWorld::BeginPlay()
+{
+	Super::BeginPlay();
+
+	InitializeWorld();
+}
+
 void AChunkWorld::InitializeWorld()
 {
 	PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
@@ -20,13 +27,6 @@ void AChunkWorld::InitializeWorld()
 	// Wait until first chunks are loaded
 	SetTickableWhenPaused(true);
 	UGameplayStatics::SetGamePaused(GetWorld(), true);
-}
-
-void AChunkWorld::BeginPlay()
-{
-	Super::BeginPlay();
-
-	InitializeWorld();
 }
 
 void AChunkWorld::Tick(float DeltaTime)
@@ -78,9 +78,6 @@ AChunk* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 	Chunk->GenerateBlocks(ChunkWorldPosition);
 	Chunk->SetParentWorld(this);
 	ChunksData.Add(ChunkCoordinates, Chunk);
-
-	// Generate blocks only; defer mesh creation to async task
-	Chunk->InitializeChunk();
 	
 	return Chunk;
 }

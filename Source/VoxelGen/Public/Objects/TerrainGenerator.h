@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Structs/NoiseOctaveSettings.h"
+#include "Structs/BiomeSettingsStruct.h"
 #include "VoxelGen/Enums.h"
 #include "TerrainGenerator.generated.h"
 
@@ -16,23 +16,28 @@ class VOXELGEN_API UTerrainGenerator : public UActorComponent
 	
 public:
 	UTerrainGenerator();
-
-	void BeginPlay() override;
 	
 	TArray<EBlock> GenerateTerrain(const FVector& ChunkPosition) const;
 
+	void SetBiomeByName(FName BiomeName);
+
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	float GetHeight(float x, float y) const;
+
+	void InitializeOctaves(const FBiomeSettingsStruct& BiomeSettings);
 	
 public:
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	TArray<FNoiseOctaveSettings> OctaveSettings;
+	TObjectPtr<UDataTable> BiomesTable;
 
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	int BaseHeight = 8;
 
 private:
 	UPROPERTY()
 	TArray<UFastNoiseWrapper*> OctaveNoises;
-	
+
+	UPROPERTY()
+	FBiomeSettingsStruct CurrentBiomeSettings;
 };

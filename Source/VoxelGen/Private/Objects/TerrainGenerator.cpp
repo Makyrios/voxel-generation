@@ -3,6 +3,7 @@
 #include "Objects/TerrainGenerator.h"
 
 #include "FastNoiseWrapper.h"
+#include "Structs/BiomeSettingsAsset.h"
 #include "Structs/ChunkData.h"
 
 UTerrainGenerator::UTerrainGenerator()
@@ -12,20 +13,13 @@ UTerrainGenerator::UTerrainGenerator()
 void UTerrainGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-
-	OctaveNoises.SetNum(OctaveSettings.Num());
-	for (int i = 0; i < OctaveSettings.Num(); ++i)
-	{
-		OctaveNoises[i] = NewObject<UFastNoiseWrapper>();
-		OctaveNoises[i]->SetupFastNoise(OctaveSettings[i].NoiseType, OctaveSettings[i].Seed, OctaveSettings[i].Frequency);
-	}
 }
 
 TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) const
 {
 	TArray<EBlock> Blocks;
 	
-	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkSize);
+	Blocks.SetNum(FChunkData::ChunkSize * FChunkData::ChunkSize * FChunkData::ChunkHeight);
 	
 	for (int x = 0; x < FChunkData::ChunkSize; ++x)
 	{
@@ -34,10 +28,9 @@ TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) 
 			const float XPos = (x * FChunkData::BlockScaledSize + ChunkPosition.X);
 			const float YPos = (y * FChunkData::BlockScaledSize + ChunkPosition.Y);
 
-			// Get the height of the block at the current x and y position by getting the noise value at the x and y position and then scaling it to the chunk height
 			const int Height = GetHeight(XPos, YPos);
 			
-			for (int z = 0; z < FChunkData::ChunkSize; ++z)
+			for (int z = 0; z < FChunkData::ChunkHeight; ++z)
 			{
 				EBlock BlockType = EBlock::Air;
 				// Chunk layers:
@@ -58,7 +51,7 @@ TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) 
 					BlockType = EBlock::Grass;
 				}
 				
-				const int Index = x + (y * FChunkData::ChunkSize) + (z * FChunkData::ChunkSize * FChunkData::ChunkSize);
+				const int Index = FChunkData::GetBlockIndex(x, y, z);
 				Blocks[Index] = BlockType;
 			}
 		}
@@ -69,13 +62,65 @@ TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) 
 
 float UTerrainGenerator::GetHeight(float x, float y) const
 {
-	float Height = BaseHeight;
-	
+	float FinalHeight = CurrentBiomeSettings.BaseHeight;
+
 	for (int i = 0; i < OctaveNoises.Num(); ++i)
 	{
-		float Noise = OctaveNoises[i]->GetNoise2D(x / 100.f, y / 100.f);
-		Height += Noise * OctaveSettings[i].Amplitude / 2.f;
+		if (OctaveNoises[i])
+		{
+			float NoiseValue = OctaveNoises[i]->GetNoise2D(x / FChunkData::BlockSize, y / FChunkData::BlockSize);
+			FinalHeight += NoiseValue * CurrentBiomeSettings.OctaveSettings[i].Amplitude;
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Octave Noise at index %d is nullptr."), i);
+		}
 	}
-	
-	return FMath::Clamp(Height, 0, FChunkData::ChunkSize);
+
+	return FMath::Clamp(FinalHeight, 0, FChunkData::ChunkHeight);
+}
+
+// float UTerrainGenerator::GetHeight(float x, float y) const
+// {
+// 	float Height = CurrentBiomeSettings.BaseHeight;
+//
+// 	float SumNoise = 0;
+// 	for (int i = 0; i < OctaveNoises.Num(); ++i)
+// 	{
+// 		SumNoise += (OctaveNoises[i]->GetNoise2D(x, y) / 2.f) + 0.5;
+// 		SumNoise *= CurrentBiomeSettings.OctaveSettings[i].Amplitude;
+// 	}
+// 	Height = SumNoise * FChunkData::ChunkHeight / 2.f;
+// 	
+// 	return FMath::Clamp(Height, 0, FChunkData::ChunkSize);
+// }
+
+void UTerrainGenerator::SetBiomeByName(FName BiomeName)
+{
+	if (!BiomesTable) return;
+
+	FBiomeSettingsStruct* FoundBiome = BiomesTable->FindRow<FBiomeSettingsStruct>(BiomeName, TEXT("Lookup Biome"));
+	if (FoundBiome)
+	{
+		CurrentBiomeSettings = *FoundBiome;
+		InitializeOctaves(CurrentBiomeSettings);
+	}
+}
+
+void UTerrainGenerator::InitializeOctaves(const FBiomeSettingsStruct& BiomeSettings)
+{
+	OctaveNoises.Empty();
+	OctaveNoises.SetNum(BiomeSettings.OctaveSettings.Num());
+
+	for (int i = 0; i < BiomeSettings.OctaveSettings.Num(); ++i)
+	{
+		OctaveNoises[i] = NewObject<UFastNoiseWrapper>();
+		OctaveNoises[i]->SetupFastNoise(
+			BiomeSettings.OctaveSettings[i].NoiseType,
+			BiomeSettings.OctaveSettings[i].Seed,
+			BiomeSettings.OctaveSettings[i].Frequency,
+			EFastNoise_Interp::Quintic,
+			EFastNoise_FractalType::FBM
+		);
+	}
 }
