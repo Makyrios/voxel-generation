@@ -80,21 +80,6 @@ float UTerrainGenerator::GetHeight(float x, float y) const
 	return FMath::Clamp(FinalHeight, 0, FChunkData::ChunkHeight);
 }
 
-// float UTerrainGenerator::GetHeight(float x, float y) const
-// {
-// 	float Height = CurrentBiomeSettings.BaseHeight;
-//
-// 	float SumNoise = 0;
-// 	for (int i = 0; i < OctaveNoises.Num(); ++i)
-// 	{
-// 		SumNoise += (OctaveNoises[i]->GetNoise2D(x, y) / 2.f) + 0.5;
-// 		SumNoise *= CurrentBiomeSettings.OctaveSettings[i].Amplitude;
-// 	}
-// 	Height = SumNoise * FChunkData::ChunkHeight / 2.f;
-// 	
-// 	return FMath::Clamp(Height, 0, FChunkData::ChunkSize);
-// }
-
 void UTerrainGenerator::SetBiomeByName(FName BiomeName)
 {
 	if (!BiomesTable) return;

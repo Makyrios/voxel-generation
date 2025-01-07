@@ -39,16 +39,32 @@ void AChunkWorld::Tick(float DeltaTime)
 
 void AChunkWorld::UpdateChunks()
 {
+	// Update only when player moved to another chunk
 	if (!IsPlayerChunkUpdated() && !UGameplayStatics::IsGamePaused(GetWorld())) return;
-
-	for (int x = CurrentPlayerChunk.X - DrawDistance; x < CurrentPlayerChunk.X + DrawDistance; ++x)
+	
+	int LoadDistance = DrawDistance + 1;
+	// Create chunks +1 which should be visible to player to remove extra polygons between chunks
+	for (int x = CurrentPlayerChunk.X - LoadDistance; x <= CurrentPlayerChunk.X + LoadDistance; ++x)
 	{
-		for (int y = CurrentPlayerChunk.Y - DrawDistance; y < CurrentPlayerChunk.Y + DrawDistance; ++y)
+		for (int y = CurrentPlayerChunk.Y - LoadDistance; y <= CurrentPlayerChunk.Y + LoadDistance; ++y)
 		{
 			if(ChunksData.Contains(FIntVector2(x, y))) continue;
 
-			AChunk* LoadedChunk = LoadChunkAtPosition(FIntVector2(x, y));
-			ChunkGenerationQueue.Enqueue(LoadedChunk);
+			LoadChunkAtPosition(FIntVector2(x, y));
+		}
+	}
+	// Generate mesh for chunks which should be visible
+	for (int x = CurrentPlayerChunk.X - DrawDistance; x <= CurrentPlayerChunk.X + DrawDistance; ++x)
+	{
+		for (int y = CurrentPlayerChunk.Y - DrawDistance; y <= CurrentPlayerChunk.Y + DrawDistance; ++y)
+		{
+			AChunk* LoadedChunk = ChunksData[FIntVector2(x, y)];
+			if (LoadedChunk && !LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
+			{
+				LoadedChunk->bIsProcessingMesh = true;
+				ChunkGenerationQueue.Enqueue(LoadedChunk);
+				UE_LOG(LogTemp, Warning, TEXT("Enqueuing Chunk at Position: %s"), *LoadedChunk->ChunkPosition.ToString());
+			}
 		}
 	}
 }
@@ -91,6 +107,7 @@ void AChunkWorld::ProcessChunksGeneration(const float DeltaTime)
 		AChunk* Chunk = nullptr;
 		if (ChunkGenerationQueue.Dequeue(Chunk))
 		{
+			UE_LOG(LogTemp, Warning, TEXT("Dequeuing Chunk at Position: %s"), *Chunk->ChunkPosition.ToString());
 			Chunk->RegenerateMeshAsync();
 		}
 		CurrentSpawnChunkDelay = SpawnChunkDelay;

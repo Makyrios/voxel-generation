@@ -37,6 +37,8 @@ public:
 	
 	EBlock GetBlockAtPosition(const FIntVector& Position) const;
 
+	bool IsMeshInitialized() const { return bIsMeshInitialized; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -50,7 +52,6 @@ private:
 	bool CheckIsAir(const FIntVector& Position) const;
 	
 	void SetBlockAtPosition(const FIntVector& Position, EBlock BlockType);
-	// int GetBlockIndex(int X, int Y, int Z) const;
 	
 	AChunk* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
 	bool AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& AdjChunkPosition, FIntVector& AdjBlockPosition) const;
@@ -66,6 +67,7 @@ private:
 
 public:
 	FIntVector2 ChunkPosition;
+	bool bIsProcessingMesh = false;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
@@ -73,8 +75,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UTerrainGenerator> TerrainGenerator;
 
-	bool bIsMeshInitialized = false;
 	bool bCanChangeBlocks = true;
+	bool bIsMeshInitialized = false;
 	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TObjectPtr<UMaterial> Material;

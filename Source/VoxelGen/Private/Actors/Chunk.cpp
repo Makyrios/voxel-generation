@@ -4,7 +4,6 @@
 #include "Actors/Chunk.h"
 
 #include "ProceduralMeshComponent.h"
-#include "FastNoiseWrapper.h"
 #include "Actors/ChunkWorld.h"
 #include "Structs/ChunkData.h"
 #include "Objects/FChunkMeshLoaderAsync.h"
@@ -59,8 +58,6 @@ void AChunk::GenerateMesh()
 			}
 		}
 	}
-
-	bIsMeshInitialized = true;
 }
 
 void AChunk::ApplyMesh()
@@ -76,7 +73,10 @@ void AChunk::ApplyMesh()
 		}
 
 		bCanChangeBlocks = true;
+		bIsProcessingMesh = false;
+		bIsMeshInitialized = true;
 	});
+	
 }
 
 FIntVector AChunk::GetPositionInDirection(EDirection Direction, const FIntVector& Position) const
@@ -144,6 +144,7 @@ bool AChunk::CheckIsAir(const FIntVector& Position) const
 
 void AChunk::RegenerateMesh()
 {
+	bIsProcessingMesh = true;
 	ChunkMeshData.Clear();
 	VertexCount = 0;
 	GenerateMesh();
@@ -272,15 +273,6 @@ bool AChunk::AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& Adj
 
 	return true;
 }
-
-// int AChunk::GetBlockIndex(int X, int Y, int Z) const
-// {
-// 	if (X < 0 || X >= FChunkData::ChunkSize || Y < 0 || Y >= FChunkData::ChunkSize || Z < 0 || Z >= FChunkData::ChunkHeight)
-// 	{
-// 		throw std::out_of_range("Block out of chunk range");
-// 	}
-// 	return X + Y * FChunkData::ChunkSize + Z * FChunkData::ChunkSize * FChunkData::ChunkHeight;
-// }
 
 bool AChunk::IsWithinChunkBounds(const FIntVector& Position) const
 {
