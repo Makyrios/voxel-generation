@@ -26,6 +26,7 @@ public:
 	
 	void RegenerateMesh();
 	void RegenerateMeshAsync();
+	void ClearMesh();
 
 	void GenerateBlocks(const FVector& ChunkWorldPosition);
 	
@@ -38,6 +39,7 @@ public:
 	EBlock GetBlockAtPosition(const FIntVector& Position) const;
 
 	bool IsMeshInitialized() const { return bIsMeshInitialized; }
+
 
 protected:
 	virtual void BeginPlay() override;

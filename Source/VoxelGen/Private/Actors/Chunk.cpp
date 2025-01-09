@@ -144,7 +144,6 @@ bool AChunk::CheckIsAir(const FIntVector& Position) const
 
 void AChunk::RegenerateMesh()
 {
-	bIsProcessingMesh = true;
 	ChunkMeshData.Clear();
 	VertexCount = 0;
 	GenerateMesh();
@@ -154,6 +153,14 @@ void AChunk::RegenerateMesh()
 void AChunk::RegenerateMeshAsync()
 {
 	(new FAutoDeleteAsyncTask<FChunkMeshLoaderAsync>(this))->StartBackgroundTask();
+}
+
+void AChunk::ClearMesh()
+{
+	if (!Mesh) return;
+	
+	Mesh->ClearAllMeshSections();
+	bIsMeshInitialized = false;
 }
 
 EBlock AChunk::GetBlockAtPosition(const FIntVector& Position) const

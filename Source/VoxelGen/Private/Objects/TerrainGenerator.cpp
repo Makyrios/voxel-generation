@@ -50,6 +50,10 @@ TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) 
 				{
 					BlockType = EBlock::Grass;
 				}
+				else if (z == Height)
+				{
+					BlockType = EBlock::Grass;
+				}
 				
 				const int Index = FChunkData::GetBlockIndex(x, y, z);
 				Blocks[Index] = BlockType;

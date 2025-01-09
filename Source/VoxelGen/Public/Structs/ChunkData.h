@@ -18,7 +18,6 @@ public:
 	static constexpr float BlockSize = 100.f;
 	static constexpr float BlockScale = 0.25f;
 	static constexpr float BlockScaledSize = BlockSize * BlockScale;
-	static constexpr int32 WorldSizeInChunks = 500;
 
 public:
 	static int32 GetBlockIndex(int32 X, int32 Y, int32 Z)
@@ -35,7 +34,7 @@ public:
 		return FIntVector(
 		(WorldBlockPosition.X % ChunkSize + ChunkSize) % ChunkSize,
 		(WorldBlockPosition.Y % ChunkSize + ChunkSize) % ChunkSize,
-		(WorldBlockPosition.Z % ChunkSize + ChunkSize) % ChunkSize
+		(WorldBlockPosition.Z % ChunkHeight + ChunkHeight) % ChunkHeight
 	);
 	}
 

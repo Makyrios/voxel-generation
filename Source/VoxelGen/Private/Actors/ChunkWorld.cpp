@@ -1,6 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
+// ChunkWorld.cpp
 #include "Actors/ChunkWorld.h"
 #include "Actors/Chunk.h"
 #include "Kismet/GameplayStatics.h"
@@ -9,113 +7,178 @@
 
 AChunkWorld::AChunkWorld()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	
+    PrimaryActorTick.bCanEverTick = true;
 }
 
 void AChunkWorld::BeginPlay()
 {
-	Super::BeginPlay();
-
-	InitializeWorld();
+    Super::BeginPlay();
+    
+    InitializeWorld();
 }
 
 void AChunkWorld::InitializeWorld()
 {
-	PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+    PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
-	// Wait until first chunks are loaded
-	SetTickableWhenPaused(true);
-	UGameplayStatics::SetGamePaused(GetWorld(), true);
+    SetTickableWhenPaused(true);
+    UGameplayStatics::SetGamePaused(GetWorld(), true);
+
+    CurrentSpawnChunkDelay = SpawnChunkDelay;
+    CurrentClearChunkDelay = ClearChunkDelay;
 }
 
 void AChunkWorld::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
-	
-	UpdateChunks();
-	ProcessChunksGeneration(DeltaTime);
+    Super::Tick(DeltaTime);
+
+    UpdateChunks();
+    ProcessChunksMeshGeneration(DeltaTime);
+    ProcessChunksMeshClear(DeltaTime);
 }
 
 void AChunkWorld::UpdateChunks()
 {
-	// Update only when player moved to another chunk
-	if (!IsPlayerChunkUpdated() && !UGameplayStatics::IsGamePaused(GetWorld())) return;
-	
-	int LoadDistance = DrawDistance + 1;
-	// Create chunks +1 which should be visible to player to remove extra polygons between chunks
-	for (int x = CurrentPlayerChunk.X - LoadDistance; x <= CurrentPlayerChunk.X + LoadDistance; ++x)
-	{
-		for (int y = CurrentPlayerChunk.Y - LoadDistance; y <= CurrentPlayerChunk.Y + LoadDistance; ++y)
-		{
-			if(ChunksData.Contains(FIntVector2(x, y))) continue;
+    if (!IsPlayerChunkUpdated() && !UGameplayStatics::IsGamePaused(GetWorld())) return;
 
-			LoadChunkAtPosition(FIntVector2(x, y));
-		}
-	}
-	// Generate mesh for chunks which should be visible
-	for (int x = CurrentPlayerChunk.X - DrawDistance; x <= CurrentPlayerChunk.X + DrawDistance; ++x)
-	{
-		for (int y = CurrentPlayerChunk.Y - DrawDistance; y <= CurrentPlayerChunk.Y + DrawDistance; ++y)
-		{
-			AChunk* LoadedChunk = ChunksData[FIntVector2(x, y)];
-			if (LoadedChunk && !LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
-			{
-				LoadedChunk->bIsProcessingMesh = true;
-				ChunkGenerationQueue.Enqueue(LoadedChunk);
-				UE_LOG(LogTemp, Warning, TEXT("Enqueuing Chunk at Position: %s"), *LoadedChunk->ChunkPosition.ToString());
-			}
-		}
-	}
+    TArray<FIntVector2> PreviousVisibleChunks = VisibleChunks;
+    VisibleChunks.Empty();
+
+    ActivateVisibleChunks(CurrentPlayerChunk);
+    DeactivatePreviousChunks(PreviousVisibleChunks);
+}
+
+bool AChunkWorld::IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int x, int y)
+{
+    return x >= ChunkCoordinates.X - DrawDistance && x <= ChunkCoordinates.X + DrawDistance &&
+        y >= ChunkCoordinates.Y - DrawDistance && y <= ChunkCoordinates.Y + DrawDistance;
+}
+
+void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
+{
+    int LoadDistance = DrawDistance + 1;
+
+    for (int x = ChunkCoordinates.X - LoadDistance; x <= ChunkCoordinates.X + LoadDistance; ++x)
+    {
+        for (int y = ChunkCoordinates.Y - LoadDistance; y <= ChunkCoordinates.Y + LoadDistance; ++y)
+        {
+            FIntVector2 Coord(x, y);
+
+            if (!ChunksData.Contains(Coord))
+            {
+                LoadChunkAtPosition(Coord);
+            }
+
+            if (IsInsideDrawDistance(ChunkCoordinates, x, y))
+            {
+                AChunk* LoadedChunk = ChunksData[Coord];
+                if (LoadedChunk && !LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
+                {
+                    EnqueueChunkForGeneration(LoadedChunk);
+                }
+                VisibleChunks.Add(Coord);
+            }
+        }
+    }
+}
+
+void AChunkWorld::DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVisibleChunks)
+{
+    for (const FIntVector2& Coord : PreviousVisibleChunks)
+    {
+        if (!VisibleChunks.Contains(Coord))
+        {
+            if (AChunk* Chunk = ChunksData[Coord])
+            {
+                EnqueueChunkForClearing(Chunk);
+            }
+        }
+    }
 }
 
 bool AChunkWorld::IsPlayerChunkUpdated()
 {
-	PlayerCharacter = PlayerCharacter ? PlayerCharacter : Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
-	if (!PlayerCharacter) return false;
-	
-	const FIntVector2 PlayerChunk = FChunkData::GetChunkPosition(PlayerCharacter->GetActorLocation());
-	if (PlayerChunk != CurrentPlayerChunk)
-	{
-		CurrentPlayerChunk = PlayerChunk;
-		return true;
-	}
-	return false;
+    if (!PlayerCharacter)
+    {
+        PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+    }
+    if (!PlayerCharacter) return false;
+
+    const FIntVector2 PlayerChunk = FChunkData::GetChunkPosition(PlayerCharacter->GetActorLocation());
+    if (PlayerChunk != CurrentPlayerChunk)
+    {
+        CurrentPlayerChunk = PlayerChunk;
+        return true;
+    }
+    return false;
 }
 
 AChunk* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 {
-	float xPos = ChunkCoordinates.X * FChunkData::ChunkSize * FChunkData::BlockScaledSize;
-	float yPos = ChunkCoordinates.Y * FChunkData::ChunkSize * FChunkData::BlockScaledSize;
-	FVector ChunkWorldPosition(xPos, yPos, 0);
-    
-	AChunk* Chunk = GetWorld()->SpawnActor<AChunk>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
-	Chunk->ChunkPosition = ChunkCoordinates;
-	Chunk->GenerateBlocks(ChunkWorldPosition);
-	Chunk->SetParentWorld(this);
-	ChunksData.Add(ChunkCoordinates, Chunk);
-	
-	return Chunk;
+    FVector ChunkWorldPosition(
+        ChunkCoordinates.X * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
+        ChunkCoordinates.Y * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
+        0.0f);
+
+    AChunk* Chunk = GetWorld()->SpawnActor<AChunk>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
+    if (Chunk)
+    {
+        Chunk->ChunkPosition = ChunkCoordinates;
+        Chunk->GenerateBlocks(ChunkWorldPosition);
+        Chunk->SetParentWorld(this);
+        ChunksData.Add(ChunkCoordinates, Chunk);
+    }
+
+    return Chunk;
 }
 
-void AChunkWorld::ProcessChunksGeneration(const float DeltaTime)
+void AChunkWorld::ProcessChunksMeshGeneration(float DeltaTime)
 {
-	CurrentSpawnChunkDelay -= DeltaTime;
+    CurrentSpawnChunkDelay -= DeltaTime;
 
-	if (CurrentSpawnChunkDelay <= 0.f && !ChunkGenerationQueue.IsEmpty())
-	{
-		AChunk* Chunk = nullptr;
-		if (ChunkGenerationQueue.Dequeue(Chunk))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Dequeuing Chunk at Position: %s"), *Chunk->ChunkPosition.ToString());
-			Chunk->RegenerateMeshAsync();
-		}
-		CurrentSpawnChunkDelay = SpawnChunkDelay;
-	}
+    if (CurrentSpawnChunkDelay <= 0.f && !ChunkGenerationQueue.IsEmpty())
+    {
+        AChunk* Chunk = nullptr;
+        if (ChunkGenerationQueue.Dequeue(Chunk) && Chunk)
+        {
+            Chunk->RegenerateMeshAsync();
+        }
+        CurrentSpawnChunkDelay = SpawnChunkDelay;
+    }
 
-	// Unpause the game when all chunks are loaded
-	if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunkGenerationQueue.IsEmpty())
-	{
-		UGameplayStatics::SetGamePaused(GetWorld(), false);
-	}
+    PauseGameIfChunksLoadingComplete();
+}
+
+void AChunkWorld::ProcessChunksMeshClear(float DeltaTime)
+{
+    CurrentClearChunkDelay -= DeltaTime;
+
+    if (CurrentClearChunkDelay <= 0.f && !ChunkClearQueue.IsEmpty())
+    {
+        AChunk* Chunk = nullptr;
+        if (ChunkClearQueue.Dequeue(Chunk) && Chunk)
+        {
+            Chunk->ClearMesh();
+        }
+        CurrentClearChunkDelay = ClearChunkDelay;
+    }
+}
+
+void AChunkWorld::EnqueueChunkForGeneration(AChunk* Chunk)
+{
+    Chunk->bIsProcessingMesh = true;
+    ChunkGenerationQueue.Enqueue(Chunk);
+}
+
+void AChunkWorld::EnqueueChunkForClearing(AChunk* Chunk)
+{
+    ChunkClearQueue.Enqueue(Chunk);
+}
+
+void AChunkWorld::PauseGameIfChunksLoadingComplete() const
+{
+    if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunkGenerationQueue.IsEmpty())
+    {
+        UGameplayStatics::SetGamePaused(GetWorld(), false);
+    }
 }
