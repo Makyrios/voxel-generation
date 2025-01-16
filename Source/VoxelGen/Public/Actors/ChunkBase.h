@@ -6,7 +6,7 @@
 #include "Structs/ChunkMeshData.h"
 #include "GameFramework/Actor.h"
 #include "Structs/ChunkData.h"
-#include "Chunk.generated.h"
+#include "ChunkBase.generated.h"
 
 enum class EDirection;
 enum class EBlock;
@@ -16,46 +16,42 @@ class UTerrainGenerator;
 class UFastNoiseWrapper;
 class AChunkWorld;
 
-UCLASS()
-class VOXELGEN_API AChunk : public AActor
+UCLASS(Abstract)
+class VOXELGEN_API AChunkBase : public AActor
 {
 	GENERATED_BODY()
 	
 public:
-	AChunk();
+	AChunkBase();
 	
 	void RegenerateMesh();
 	void RegenerateMeshAsync();
 	void ClearMesh();
 
 	void GenerateBlocks(const FVector& ChunkWorldPosition);
-	
+
 	void SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType);
-	
 	void DestroyBlock(const FIntVector& LocalChunkBlockPosition);
 	
 	void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
-	
 	EBlock GetBlockAtPosition(const FIntVector& Position) const;
-
+	EBlock GetBlockAtPosition(int X, int Y, int Z) const;
 	bool IsMeshInitialized() const { return bIsMeshInitialized; }
-
-
+	
 protected:
 	virtual void BeginPlay() override;
+	
+	virtual void GenerateMesh() PURE_VIRTUAL(&AChunkBase::GenerateMesh);
 
-private:
-	void GenerateMesh();
-	void ApplyMesh();
-	void CreateFace(EDirection Direction, const FIntVector& Position);
-	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& WorldPosition) const;
-	FIntVector GetPositionInDirection(EDirection Direction, const FIntVector& Position) const;
-	
+	int GetTextureIndex(EBlock BlockType, const FVector& Normal) const;
+
 	bool CheckIsAir(const FIntVector& Position) const;
-	
+	bool CheckIsAir(int X, int Y, int Z) const;
+
+	FIntVector GetPositionInDirection(EDirection Direction, const FIntVector& Position) const;
 	void SetBlockAtPosition(const FIntVector& Position, EBlock BlockType);
-	
-	AChunk* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
+
+	AChunkBase* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
 	bool AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& AdjChunkPosition, FIntVector& AdjBlockPosition) const;
 
 	bool IsWithinChunkBounds(const FIntVector& Position) const;
@@ -65,31 +61,26 @@ private:
 	void UpdateAdjacentChunk(const FIntVector& LocalEdgeBlockPosition) const;
 	TArray<FIntVector> GetEdgeOffsets(const FIntVector& LocalEdgeBlockPosition) const;
 
-	int GetTextureIndex(EBlock BlockType, EDirection Direction) const;
+private:
+	void ApplyMesh();
 
 public:
 	FIntVector2 ChunkPosition;
 	bool bIsProcessingMesh = false;
 
-private:
+protected:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UTerrainGenerator> TerrainGenerator;
 
-	bool bCanChangeBlocks = true;
-	bool bIsMeshInitialized = false;
+	TArray<EBlock> Blocks;
 	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TObjectPtr<UMaterial> Material;
-	
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.03;
 
 	UPROPERTY()
 	AChunkWorld* ParentWorld;
-
-	TArray<EBlock> Blocks;
 
 	FChunkMeshData ChunkMeshData;
 	int VertexCount = 0;
@@ -113,5 +104,10 @@ private:
 		5,4,1,0, // Up
 		3,2,7,6  // Down
 	};
+
+private:
+	bool bIsMeshInitialized = false;
+	bool bCanChangeBlocks = true;
+
 	
 };

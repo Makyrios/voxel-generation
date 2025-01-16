@@ -2,16 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Async/AsyncWork.h"
-#include "Actors/Chunk.h"
+#include "Actors/ChunkBase.h"
 
 class FChunkMeshLoaderAsync : public FNonAbandonableTask
 {
 public:
-	FChunkMeshLoaderAsync(AChunk* InChunk);
+	FChunkMeshLoaderAsync(AChunkBase* InChunk);
 
 	static TStatId GetStatId();
 	void DoWork();
 
 private:
-	AChunk* Chunk;
+	AChunkBase* Chunk;
 };

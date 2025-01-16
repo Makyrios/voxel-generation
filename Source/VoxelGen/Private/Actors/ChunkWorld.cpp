@@ -1,9 +1,10 @@
-// ChunkWorld.cpp
 #include "Actors/ChunkWorld.h"
-#include "Actors/Chunk.h"
+#include "Actors/DefaultChunk.h"
+#include "Actors/GreedyChunk.h"
 #include "Kismet/GameplayStatics.h"
 #include "Structs/ChunkData.h"
 #include "Player/Character/VoxelGenerationCharacter.h"
+#include "VoxelGen/Enums.h"
 
 AChunkWorld::AChunkWorld()
 {
@@ -71,7 +72,7 @@ void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
 
             if (IsInsideDrawDistance(ChunkCoordinates, x, y))
             {
-                AChunk* LoadedChunk = ChunksData[Coord];
+                AChunkBase* LoadedChunk = ChunksData[Coord];
                 if (LoadedChunk && !LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
                 {
                     EnqueueChunkForGeneration(LoadedChunk);
@@ -88,7 +89,7 @@ void AChunkWorld::DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVi
     {
         if (!VisibleChunks.Contains(Coord))
         {
-            if (AChunk* Chunk = ChunksData[Coord])
+            if (AChunkBase* Chunk = ChunksData[Coord])
             {
                 EnqueueChunkForClearing(Chunk);
             }
@@ -113,14 +114,14 @@ bool AChunkWorld::IsPlayerChunkUpdated()
     return false;
 }
 
-AChunk* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
+AChunkBase* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 {
     FVector ChunkWorldPosition(
         ChunkCoordinates.X * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
         ChunkCoordinates.Y * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
         0.0f);
 
-    AChunk* Chunk = GetWorld()->SpawnActor<AChunk>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
+    AChunkBase* Chunk = GetWorld()->SpawnActor<AChunkBase>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
     if (Chunk)
     {
         Chunk->ChunkPosition = ChunkCoordinates;
@@ -138,7 +139,7 @@ void AChunkWorld::ProcessChunksMeshGeneration(float DeltaTime)
 
     if (CurrentSpawnChunkDelay <= 0.f && !ChunkGenerationQueue.IsEmpty())
     {
-        AChunk* Chunk = nullptr;
+        AChunkBase* Chunk = nullptr;
         if (ChunkGenerationQueue.Dequeue(Chunk) && Chunk)
         {
             Chunk->RegenerateMeshAsync();
@@ -155,7 +156,7 @@ void AChunkWorld::ProcessChunksMeshClear(float DeltaTime)
 
     if (CurrentClearChunkDelay <= 0.f && !ChunkClearQueue.IsEmpty())
     {
-        AChunk* Chunk = nullptr;
+        AChunkBase* Chunk = nullptr;
         if (ChunkClearQueue.Dequeue(Chunk) && Chunk)
         {
             Chunk->ClearMesh();
@@ -164,13 +165,13 @@ void AChunkWorld::ProcessChunksMeshClear(float DeltaTime)
     }
 }
 
-void AChunkWorld::EnqueueChunkForGeneration(AChunk* Chunk)
+void AChunkWorld::EnqueueChunkForGeneration(AChunkBase* Chunk)
 {
     Chunk->bIsProcessingMesh = true;
     ChunkGenerationQueue.Enqueue(Chunk);
 }
 
-void AChunkWorld::EnqueueChunkForClearing(AChunk* Chunk)
+void AChunkWorld::EnqueueChunkForClearing(AChunkBase* Chunk)
 {
     ChunkClearQueue.Enqueue(Chunk);
 }

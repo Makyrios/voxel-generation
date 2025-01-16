@@ -9,6 +9,7 @@ struct FChunkMeshData
 public:
 	TArray<FVector> Vertices;
 	TArray<int> Triangles;
+	TArray<FVector> Normals;
 	TArray<FVector2D> UV;
 	TArray<FColor> Colors;
 

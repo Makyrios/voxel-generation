@@ -7,7 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
-#include "Actors/Chunk.h"
+#include "Actors/ChunkBase.h"
 #include "Structs/ChunkData.h"
 #include "VoxelGen/Enums.h"
 
@@ -92,7 +92,7 @@ void AVoxelGenerationCharacter::DestroyBlock()
 	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
 	if (!bHit) return;
 
-	if (AChunk* Chunk = Cast<AChunk>(HitResult.GetActor()))
+	if (AChunkBase* Chunk = Cast<AChunkBase>(HitResult.GetActor()))
 	{
 		const FVector& HitLocation = HitResult.Location;
 		const FVector& ImpactNormal = HitResult.ImpactNormal;
@@ -115,7 +115,7 @@ void AVoxelGenerationCharacter::SpawnBlock()
 	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
 	if (!bHit) return;
 
-	if (AChunk* Chunk = Cast<AChunk>(HitResult.GetActor()))
+	if (AChunkBase* Chunk = Cast<AChunkBase>(HitResult.GetActor()))
 	{
 		const FVector& HitLocation = HitResult.Location;
 		const FVector& ImpactNormal = HitResult.ImpactNormal;

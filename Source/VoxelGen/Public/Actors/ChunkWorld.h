@@ -6,7 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "ChunkWorld.generated.h"
 
-class AChunk;
+class AChunkBase;
 class AVoxelGenerationCharacter;
 
 UCLASS()
@@ -18,11 +18,13 @@ public:
 	AChunkWorld();
 	void InitializeWorld();
 
-	const TMap<FIntVector2, AChunk*>& GetChunksData() { return ChunksData; }
+	const TMap<FIntVector2, AChunkBase*>& GetChunksData() { return ChunksData; }
+
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
+	
 
 private:
 	void UpdateChunks();
@@ -30,21 +32,21 @@ private:
 	void ProcessChunksMeshClear(float DeltaTime);
 
 	bool IsPlayerChunkUpdated();
-	AChunk* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
+	AChunkBase* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
 
 	void ActivateVisibleChunks(const FIntVector2& ChunkCoordinates);
 	bool IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int x, int y);
 	void DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVisibleChunks);
 
-	void EnqueueChunkForGeneration(AChunk* Chunk);
-	void EnqueueChunkForClearing(AChunk* Chunk);
+	void EnqueueChunkForGeneration(AChunkBase* Chunk);
+	void EnqueueChunkForClearing(AChunkBase* Chunk);
 
 	void PauseGameIfChunksLoadingComplete() const;
 
 private:
-	TMap<FIntVector2, AChunk*> ChunksData;
-	TQueue<AChunk*> ChunkGenerationQueue;
-	TQueue<AChunk*> ChunkClearQueue;
+	TMap<FIntVector2, AChunkBase*> ChunksData;
+	TQueue<AChunkBase*> ChunkGenerationQueue;
+	TQueue<AChunkBase*> ChunkClearQueue;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk World")
 	float SpawnChunkDelay = 0.02f;
@@ -61,7 +63,7 @@ private:
 	AVoxelGenerationCharacter* PlayerCharacter = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chunk World")
-	TSubclassOf<AChunk> ChunkClass;
+	TSubclassOf<AChunkBase> ChunkClass;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk World")
 	int DrawDistance = 5;

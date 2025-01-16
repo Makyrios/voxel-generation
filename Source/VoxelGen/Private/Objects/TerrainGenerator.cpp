@@ -3,7 +3,6 @@
 #include "Objects/TerrainGenerator.h"
 
 #include "FastNoiseWrapper.h"
-#include "Structs/BiomeSettingsAsset.h"
 #include "Structs/ChunkData.h"
 
 UTerrainGenerator::UTerrainGenerator()

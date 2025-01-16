@@ -1,8 +1,8 @@
 ﻿#include "Objects/FChunkMeshLoaderAsync.h"
 
-#include "Actors/Chunk.h"
+#include "Actors/ChunkBase.h"
 
-FChunkMeshLoaderAsync::FChunkMeshLoaderAsync(AChunk* InChunk) : Chunk(InChunk)
+FChunkMeshLoaderAsync::FChunkMeshLoaderAsync(AChunkBase* InChunk) : Chunk(InChunk)
 {
 }
 
