@@ -13,7 +13,6 @@ struct VOXELGEN_API FNoiseOctaveSettings
 {
 	GENERATED_BODY()
 	
-public:
 	UPROPERTY(EditAnywhere)
 	EFastNoise_NoiseType NoiseType = EFastNoise_NoiseType::Perlin;
 	UPROPERTY(EditAnywhere)
@@ -22,4 +21,5 @@ public:
 	float Frequency = 0.1f;
 	UPROPERTY(EditAnywhere)
 	float Amplitude = 1.0f;
+	
 };

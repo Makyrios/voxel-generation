@@ -10,10 +10,11 @@ enum class EDirection
 	Down
 };
 
+UENUM()
 enum class EBlock
 {
-	Air,
-	Grass,
-	Dirt,
-	Stone
+	Air UMETA(DisplayName = "Air"),
+	Grass UMETA(DisplayName = "Grass"),
+	Dirt UMETA(DisplayName = "Dirt"),
+	Stone UMETA(DisplayName = "Stone")
 };

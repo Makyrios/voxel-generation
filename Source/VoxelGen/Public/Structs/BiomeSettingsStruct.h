@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlockLayer.h"
 #include "NoiseOctaveSettings.h"
 #include "BiomeSettingsStruct.generated.h"
 
@@ -19,4 +20,8 @@ struct VOXELGEN_API FBiomeSettingsStruct : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, Category = "Biome Settings")
 	TArray<FNoiseOctaveSettings> OctaveSettings;
+	
+	UPROPERTY(EditAnywhere, Category = "Biome Settings")
+	TArray<FBlockLayer> Layers;
+	
 };

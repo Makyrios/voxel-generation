@@ -15,14 +15,9 @@ class VOXELGEN_API UTerrainGenerator : public UActorComponent
 	GENERATED_BODY()
 	
 public:
-	UTerrainGenerator();
-	
 	TArray<EBlock> GenerateTerrain(const FVector& ChunkPosition) const;
 
 	void SetBiomeByName(FName BiomeName);
-
-protected:
-	virtual void BeginPlay() override;
 
 private:
 	float GetHeight(float x, float y) const;

@@ -3,16 +3,8 @@
 #include "Objects/TerrainGenerator.h"
 
 #include "FastNoiseWrapper.h"
+#include "Structs/BlockLayer.h"
 #include "Structs/ChunkData.h"
-
-UTerrainGenerator::UTerrainGenerator()
-{
-}
-
-void UTerrainGenerator::BeginPlay()
-{
-	Super::BeginPlay();
-}
 
 TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) const
 {
@@ -28,34 +20,16 @@ TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) 
 			const float YPos = (y * FChunkData::BlockScaledSize + ChunkPosition.Y);
 
 			const int Height = GetHeight(XPos, YPos);
+			int CurrentHeight = Height;
 			
-			for (int z = 0; z < FChunkData::ChunkHeight; ++z)
+			for (const FBlockLayer& Layer : CurrentBiomeSettings.Layers)
 			{
-				EBlock BlockType = EBlock::Air;
-				// Chunk layers:
-				// Air
-				// Grass
-				// Dirt
-				// Stone
-				if (z < Height - 3)
+				int LayerEndHeight = CurrentHeight - Layer.LayerThickness;
+				for (int z = CurrentHeight; z >= 0 && z > LayerEndHeight; --z)
 				{
-					BlockType = EBlock::Stone;
+					Blocks[FChunkData::GetBlockIndex(x, y, z)] = Layer.BlockType;
 				}
-				else if (z < Height - 1)
-				{
-					BlockType = EBlock::Dirt;
-				}
-				else if (z == Height - 1)
-				{
-					BlockType = EBlock::Grass;
-				}
-				else if (z == Height)
-				{
-					BlockType = EBlock::Grass;
-				}
-				
-				const int Index = FChunkData::GetBlockIndex(x, y, z);
-				Blocks[Index] = BlockType;
+				CurrentHeight = LayerEndHeight;
 			}
 		}
 	}
