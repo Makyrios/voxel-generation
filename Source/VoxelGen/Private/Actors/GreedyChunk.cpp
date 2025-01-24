@@ -1,5 +1,6 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
+
 #include "Actors/GreedyChunk.h"
 
 #include "VoxelGen/Enums.h"
@@ -26,20 +27,35 @@ void AGreedyChunk::GenerateMesh()
 
         // Create a mask array to hold visibility and block data
         TArray<FMask> Mask;
-        const float Size = FChunkData::ChunkSize;
+        const int Size = FChunkData::ChunkSize;
         const int ChunkHeight = FChunkData::ChunkHeight; // Height of the chunk
-        Mask.SetNum(Size * ChunkHeight);
+
+        int InnerAxisSize1; // Width of the slice (along Axis1)
+        int InnerAxisSize2; // Height of the slice (along Axis2)
+
+        if (Axis == 2) { // Z-axis (Top/Bottom)
+            InnerAxisSize1 = Size;
+            InnerAxisSize2 = Size;
+        } else if (Axis == 0) { // X-axis (Walls along X)
+            InnerAxisSize1 = Size;
+            InnerAxisSize2 = ChunkHeight;
+        } else { // Axis == 1 (Y-axis) (Walls along Y)
+            InnerAxisSize1 = ChunkHeight;
+            InnerAxisSize2 = Size;
+        }
+        Mask.SetNum(InnerAxisSize1 * InnerAxisSize2); // Corrected mask size
 
         // Sweep along the current axis
-        for (ChunkItr[Axis] = -1; ChunkItr[Axis] < Size;)
+        int MainAxisSize = (Axis == 2) ? ChunkHeight : Size; // Determine the size along the current axis
+        for (ChunkItr[Axis] = -1; ChunkItr[Axis] < MainAxisSize;) // Corrected loop bound
         {
             int N = 0;
 
-            // Traverse along Axis2 (e.g., Y)
-            for (ChunkItr[Axis2] = 0; ChunkItr[Axis2] < Size; ++ChunkItr[Axis2])
+            // Traverse along Axis2 (e.g., Y) - Height of the slice
+            for (ChunkItr[Axis2] = 0; ChunkItr[Axis2] < InnerAxisSize2; ++ChunkItr[Axis2])
             {
-                // Traverse along Axis1 (e.g., X)
-                for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < Size; ++ChunkItr[Axis1])
+                // Traverse along Axis1 (e.g., X) - Width of the slice
+                for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < InnerAxisSize1; ++ChunkItr[Axis1])
                 {
                     const auto CurrentBlock = GetBlockAtPosition(ChunkItr);
                     const auto CompareBlock = GetBlockAtPosition(ChunkItr + AxisMask);
@@ -69,9 +85,9 @@ void AGreedyChunk::GenerateMesh()
             N = 0;
 
             // Iterate over the mask to generate quads for visible faces
-            for (int j = 0; j < Size; ++j)
+            for (int j = 0; j < InnerAxisSize2; ++j) // Iterate through height of the mask
             {
-                for (int i = 0; i < Size;)
+                for (int i = 0; i < InnerAxisSize1;) // Iterate through width of the mask
                 {
                     // If there is a visible face at this mask position
                     if (Mask[N].Normal != 0)
@@ -82,17 +98,17 @@ void AGreedyChunk::GenerateMesh()
 
                         // Determine the width of the quad
                         int Width;
-                        for (Width = 1; i + Width < Size && CompareMask(Mask[N + Width], CurrentMask); ++Width) {}
+                        for (Width = 1; i + Width < InnerAxisSize1 && CompareMask(Mask[N + Width], CurrentMask); ++Width) {} // Corrected Width loop bound
 
                         // Determine the height of the quad
                         int Height;
                         bool Done = false;
 
-                        for (Height = 1; j + Height < Size; ++Height)
+                        for (Height = 1; j + Height < InnerAxisSize2; ++Height) // Corrected Height loop bound
                         {
                             for (int k = 0; k < Width; ++k)
                             {
-                                if (!CompareMask(Mask[N + k + Height * Size], CurrentMask))
+                                if (!CompareMask(Mask[N + k + Height * InnerAxisSize1], CurrentMask)) // Corrected Mask index
                                 {
                                     Done = true; // Stop if a non-matching block is found
                                     break;
@@ -124,7 +140,7 @@ void AGreedyChunk::GenerateMesh()
                         {
                             for (int k = 0; k < Width; ++k)
                             {
-                                Mask[N + k + l * Size] = FMask{EBlock::Air, 0};
+                                Mask[N + k + l * InnerAxisSize1] = FMask{EBlock::Air, 0}; // Corrected Mask index
                             }
                         }
 
@@ -164,7 +180,7 @@ void AGreedyChunk::CreateQuad(
         FVector(V2) * FChunkData::BlockScaledSize,
         FVector(V3) * FChunkData::BlockScaledSize,
         FVector(V4) * FChunkData::BlockScaledSize
-    });
+        });
 
     ChunkMeshData.Triangles.Append({
         VertexCount,
@@ -173,7 +189,7 @@ void AGreedyChunk::CreateQuad(
         VertexCount + 3,
         VertexCount + 1 - Mask.Normal,
         VertexCount + 1 + Mask.Normal
-    });
+        });
 
     ChunkMeshData.Normals.Append({ Normal, Normal, Normal, Normal });
 
@@ -186,7 +202,7 @@ void AGreedyChunk::CreateQuad(
             FVector2D(0, Height),
             FVector2D(Width, 0),
             FVector2D(0, 0),
-        });
+            });
     }
     else
     {
@@ -195,7 +211,7 @@ void AGreedyChunk::CreateQuad(
             FVector2D(Height, 0),
             FVector2D(0, Width),
             FVector2D(0, 0),
-        });
+            });
     }
 
     VertexCount += 4;
