@@ -14,7 +14,7 @@ struct FChunkData
 public:
 	static constexpr int32 ChunkSize = 32;
 	static constexpr int32 ChunkSizeSq = ChunkSize * ChunkSize;
-	static constexpr int32 ChunkHeight = ChunkSize;
+	static constexpr int32 ChunkHeight = 64;
 	static constexpr float BlockSize = 100.f;
 	static constexpr float BlockScale = 0.25f;
 	static constexpr float BlockScaledSize = BlockSize * BlockScale;

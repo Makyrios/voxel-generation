@@ -5,10 +5,10 @@
 #include "CoreMinimal.h"
 #include "BlockLayer.h"
 #include "NoiseOctaveSettings.h"
-#include "BiomeSettingsStruct.generated.h"
+#include "BiomeSettings.generated.h"
 
 USTRUCT(BlueprintType)
-struct VOXELGEN_API FBiomeSettingsStruct : public FTableRowBase
+struct VOXELGEN_API FBiomeSettings : public FTableRowBase
 {
 	GENERATED_BODY()
 
@@ -23,5 +23,4 @@ struct VOXELGEN_API FBiomeSettingsStruct : public FTableRowBase
 	
 	UPROPERTY(EditAnywhere, Category = "Biome Settings")
 	TArray<FBlockLayer> Layers;
-	
 };

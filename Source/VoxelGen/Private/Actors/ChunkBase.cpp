@@ -111,9 +111,9 @@ void AChunkBase::ClearMesh()
 void AChunkBase::GenerateBlocks(const FVector& ChunkWorldPosition)
 {
 	if (!TerrainGenerator) return;
-
+	
+	// 	TerrainGenerator->SetBiomeByName("Steppe");
 	TerrainGenerator->SetBiomeByName("Mountains");
-	// TerrainGenerator->SetBiomeByName("Steppe");
 	Blocks = TerrainGenerator->GenerateTerrain(ChunkWorldPosition);
 }
 

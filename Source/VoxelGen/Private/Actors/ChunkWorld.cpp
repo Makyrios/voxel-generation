@@ -1,10 +1,10 @@
 #include "Actors/ChunkWorld.h"
-#include "Actors/DefaultChunk.h"
+
+#include "FastNoiseWrapper.h"
 #include "Actors/GreedyChunk.h"
 #include "Kismet/GameplayStatics.h"
 #include "Structs/ChunkData.h"
 #include "Player/Character/VoxelGenerationCharacter.h"
-#include "VoxelGen/Enums.h"
 
 AChunkWorld::AChunkWorld()
 {
@@ -57,6 +57,7 @@ bool AChunkWorld::IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int 
 
 void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
 {
+    // Load chunks in a visible radius + 1 to hide meshes between neighbor chunks
     int LoadDistance = DrawDistance + 1;
 
     for (int x = ChunkCoordinates.X - LoadDistance; x <= ChunkCoordinates.X + LoadDistance; ++x)

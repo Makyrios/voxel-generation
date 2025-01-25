@@ -6,7 +6,7 @@
 #include "Structs/BlockLayer.h"
 #include "Structs/ChunkData.h"
 
-TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition) const
+TArray<EBlock> UTerrainGenerator::GenerateTerrain(const FVector& ChunkPosition)
 {
 	TArray<EBlock> Blocks;
 	
@@ -61,8 +61,7 @@ void UTerrainGenerator::SetBiomeByName(FName BiomeName)
 {
 	if (!BiomesTable) return;
 
-	FBiomeSettingsStruct* FoundBiome = BiomesTable->FindRow<FBiomeSettingsStruct>(BiomeName, TEXT("Lookup Biome"));
-	if (FoundBiome)
+	if (FBiomeSettings* FoundBiome = BiomesTable->FindRow<FBiomeSettings>(BiomeName, "Lookup Biome"))
 	{
 		CurrentBiomeSettings = *FoundBiome;
 		InitializeOctaves(CurrentBiomeSettings);

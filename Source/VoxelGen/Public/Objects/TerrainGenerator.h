@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Structs/BiomeSettingsStruct.h"
+#include "Structs/BiomeSettings.h"
 #include "VoxelGen/Enums.h"
 #include "TerrainGenerator.generated.h"
 
@@ -15,19 +15,18 @@ class VOXELGEN_API UTerrainGenerator : public UActorComponent
 	GENERATED_BODY()
 	
 public:
-	TArray<EBlock> GenerateTerrain(const FVector& ChunkPosition) const;
+	TArray<EBlock> GenerateTerrain(const FVector& ChunkPosition);
 
 	void SetBiomeByName(FName BiomeName);
 
-private:
+private:	
 	float GetHeight(float x, float y) const;
 
-	void InitializeOctaves(const FBiomeSettingsStruct& BiomeSettings);
+	void InitializeOctaves(const FBiomeSettings& BiomeSettings);
 	
 public:
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	TObjectPtr<UDataTable> BiomesTable;
-
 
 private:
 	UPROPERTY()
