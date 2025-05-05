@@ -27,8 +27,8 @@ void AGreedyChunk::GenerateMesh()
 
         // Create a mask array to hold visibility and block data
         TArray<FMask> Mask;
-        const int Size = FChunkData::ChunkSize;
-        const int ChunkHeight = FChunkData::ChunkHeight; // Height of the chunk
+        const int Size = FChunkData::GetChunkSize(this);
+        const int ChunkHeight = FChunkData::GetChunkHeight(this); // Height of the chunk
 
         int InnerAxisSize1; // Width of the slice (along Axis1)
         int InnerAxisSize2; // Height of the slice (along Axis2)
@@ -43,7 +43,7 @@ void AGreedyChunk::GenerateMesh()
             InnerAxisSize1 = ChunkHeight;
             InnerAxisSize2 = Size;
         }
-        Mask.SetNum(InnerAxisSize1 * InnerAxisSize2); // Corrected mask size
+        Mask.SetNum(InnerAxisSize1 * InnerAxisSize2);
 
         // Sweep along the current axis
         int MainAxisSize = (Axis == 2) ? ChunkHeight : Size; // Determine the size along the current axis
@@ -58,6 +58,24 @@ void AGreedyChunk::GenerateMesh()
                 for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < InnerAxisSize1; ++ChunkItr[Axis1])
                 {
                     const auto CurrentBlock = GetBlockAtPosition(ChunkItr);
+
+                    // Skip drawing edge faces
+                    if (Axis == 0 && ChunkItr.X == -1)
+                    {
+                        Mask[N++] = FMask{EBlock::Air, 0};
+                        continue;
+                    }
+                    if (Axis == 1 && ChunkItr.Y == -1)
+                    {
+                        Mask[N++] = FMask{EBlock::Air, 0};
+                        continue;
+                    }
+                    if (Axis == 2 && ChunkItr.Z == -1)
+                    {
+                        Mask[N++] = FMask{EBlock::Air, 0};
+                        continue;
+                    }
+                    
                     const auto CompareBlock = GetBlockAtPosition(ChunkItr + AxisMask);
 
                     // Determine block visibility (air blocks are not visible)
@@ -176,10 +194,10 @@ void AGreedyChunk::CreateQuad(
     const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
 
     ChunkMeshData.Vertices.Append({
-        FVector(V1) * FChunkData::BlockScaledSize,
-        FVector(V2) * FChunkData::BlockScaledSize,
-        FVector(V3) * FChunkData::BlockScaledSize,
-        FVector(V4) * FChunkData::BlockScaledSize
+        FVector(V1) * FChunkData::GetScaledBlockSize(this),
+        FVector(V2) * FChunkData::GetScaledBlockSize(this),
+        FVector(V3) * FChunkData::GetScaledBlockSize(this),
+        FVector(V4) * FChunkData::GetScaledBlockSize(this)
         });
 
     ChunkMeshData.Triangles.Append({
