@@ -25,8 +25,5 @@ public:
 	float BlockSize = 100.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
-	float BlockScale = 0.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
-	int32 WaterThreshold = 10;
+	float BlockScale = 1.f;
 };

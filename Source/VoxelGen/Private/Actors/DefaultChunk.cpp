@@ -18,11 +18,11 @@ void ADefaultChunk::BeginPlay()
 
 void ADefaultChunk::GenerateMesh()
 {
-	for (int x = 0; x < FChunkData::ChunkSize; ++x)
+	for (int x = 0; x < FChunkData::GetChunkSize(this); ++x)
 	{
-		for (int y = 0; y < FChunkData::ChunkSize; ++y)
+		for (int y = 0; y < FChunkData::GetChunkSize(this); ++y)
 		{
-			for (int z = 0; z < FChunkData::ChunkHeight; ++z)
+			for (int z = 0; z < FChunkData::GetChunkHeight(this); ++z)
 			{
 				if (GetBlockAtPosition(FIntVector(x, y, z)) == EBlock::Air) continue;
 				
@@ -42,7 +42,7 @@ void ADefaultChunk::GenerateMesh()
 void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position)
 {
 	FVector WorldPosition(Position);
-	WorldPosition *= FChunkData::BlockScaledSize;
+	WorldPosition *= FChunkData::GetScaledBlockSize(this);
 	ChunkMeshData.Vertices.Append(GetFaceVerticies(Direction, WorldPosition));
 	ChunkMeshData.UV.Append({ FVector2D(1, 0), FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1) });
 	ChunkMeshData.Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
@@ -76,7 +76,7 @@ TArray<FVector> ADefaultChunk::GetFaceVerticies(EDirection Direction, const FVec
 	{
 		// Get the verticies for the face by getting the index of the verticies from the triangle data
 		FVector Pos(WorldPosition.X, WorldPosition.Y, WorldPosition.Z);
-		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * FChunkData::BlockScale + Pos);
+		FaceVerticies.Add(BlockVerticies[BlockTriangles[static_cast<int>(Direction) * 4 + i]] * FChunkData::GetBlockScale(this) + Pos);
 	}
 
 	return FaceVerticies;

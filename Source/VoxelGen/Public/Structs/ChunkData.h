@@ -37,6 +37,4 @@ public:
 	static float GetBlockScale(const UObject* WorldContext);
 
 	static float GetScaledBlockSize(const UObject* WorldContext);
-
-	static float GetWaterThreshold(const UObject* WorldContext);
 };

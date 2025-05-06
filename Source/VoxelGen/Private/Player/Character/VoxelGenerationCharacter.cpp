@@ -8,6 +8,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Actors/ChunkBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Structs/ChunkData.h"
 #include "VoxelGen/Enums.h"
 
@@ -57,6 +58,8 @@ void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* Playe
 		EnhancedInputComponent->BindAction(SpawnBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::SpawnBlock);
 
 		EnhancedInputComponent->BindAction(DestroyBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::DestroyBlock);
+
+		EnhancedInputComponent->BindAction(FlyAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::Fly);
 	}
 }
 
@@ -97,11 +100,11 @@ void AVoxelGenerationCharacter::DestroyBlock()
 		const FVector& HitLocation = HitResult.Location;
 		const FVector& ImpactNormal = HitResult.ImpactNormal;
 		
-		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
+		float BlockScaledSize = FChunkData::GetBlockSize(this) * FChunkData::GetBlockScale(this);
 		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
-		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(InteractedBlockPosition);
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(this, InteractedBlockPosition);
 		
-		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition);
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(this, InteractedWorldBlockPosition);
 		Chunk->DestroyBlock(LocalChunkBlockPosition);
 	}
 }
@@ -119,19 +122,34 @@ void AVoxelGenerationCharacter::SpawnBlock()
 	{
 		const FVector& HitLocation = HitResult.Location;
 		const FVector& ImpactNormal = HitResult.ImpactNormal;
-		float BlockScaledSize = FChunkData::BlockSize * FChunkData::BlockScale;
+		float BlockScaledSize = FChunkData::GetBlockSize(this) * FChunkData::GetBlockScale(this);
 		
 		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
 		FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
 
-		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(InteractedBlockPosition);
-		FIntVector WorldBlockPosition = FChunkData::GetWorldBlockPosition(SpawnBlockPosition);
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(this, InteractedBlockPosition);
+		FIntVector WorldBlockPosition = FChunkData::GetWorldBlockPosition(this, SpawnBlockPosition);
 
 		UE_LOG(LogTemp, Warning, TEXT("InteractedWorldBlockPosition: %s"), *InteractedWorldBlockPosition.ToString());
 		UE_LOG(LogTemp, Warning, TEXT("WorldBlockPosition: %s"), *WorldBlockPosition.ToString());
 		
 		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
-		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(this, InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
 		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Dirt);
+	}
+}
+
+void AVoxelGenerationCharacter::Fly()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			MovementComponent->SetMovementMode(MOVE_Walking);
+		}
+		else
+		{
+			MovementComponent->SetMovementMode(MOVE_Flying);
+		}
 	}
 }

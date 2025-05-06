@@ -1,149 +1,93 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Structs/ChunkData.h"
-
 #include "GameInstances/WorldGameInstance.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 
-int32 FChunkData::GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, int32 Z)
-{
-	if (X < 0 || X >= GetChunkSize(WorldContext) || Y < 0 || Y >= GetChunkSize(WorldContext) || Z < 0 || Z >= GetChunkHeight(WorldContext))
-	{
-		return -1;
-	}
-	return X + (Y * GetChunkSize(WorldContext)) + (Z * GetChunkSize(WorldContext) * GetChunkSize(WorldContext));
+// Helper function (optional, put inside cpp)
+namespace {
+    UWorldGameInstance* GetWorldGI(const UObject* WorldContext) {
+        if (!WorldContext) return nullptr;
+        UWorld* World = WorldContext->GetWorld();
+        if (!World) return nullptr;
+        return Cast<UWorldGameInstance>(World->GetGameInstance());
+    }
 }
 
-int32 FChunkData::GetColumnIndex(const UObject* WorldContext, int32 X, int32 Y)
-{
-	if (X < 0 || X >= GetChunkSize(WorldContext) || Y < 0 || Y >= GetChunkSize(WorldContext))
-	{
-		return -1;
-	}
-	return X + (Y * GetChunkSize(WorldContext));
+int32 FChunkData::GetWorldSize(const UObject* WorldContext) {
+    UWorldGameInstance* GI = GetWorldGI(WorldContext);
+    return GI ? GI->WorldSize : 30; // Default from your original code
 }
 
-FIntVector FChunkData::GetLocalBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition)
-{
-	return FIntVector(
-		(WorldBlockPosition.X % GetChunkSize(WorldContext) + GetChunkSize(WorldContext)) % GetChunkSize(WorldContext),
-		(WorldBlockPosition.Y % GetChunkSize(WorldContext) + GetChunkSize(WorldContext)) % GetChunkSize(WorldContext),
-		(WorldBlockPosition.Z % GetChunkHeight(WorldContext) + GetChunkHeight(WorldContext)) % GetChunkHeight(WorldContext)
-		);
+int32 FChunkData::GetWorldSizeInColumns(const UObject* WorldContext) {
+    return GetWorldSize(WorldContext) * GetChunkSize(WorldContext);
 }
 
-FIntVector FChunkData::GetWorldBlockPosition(const UObject* WorldContext, const FVector& WorldPosition)
-{
-	FVector BlockPosition3D = WorldPosition / (GetScaledBlockSize(WorldContext));
-	return FIntVector(
-		FMath::FloorToInt(BlockPosition3D.X),
-		FMath::FloorToInt(BlockPosition3D.Y),
-		FMath::FloorToInt(BlockPosition3D.Z)
-	);
+int32 FChunkData::GetChunkSize(const UObject* WorldContext) {
+    UWorldGameInstance* GI = GetWorldGI(WorldContext);
+    return GI ? GI->ChunkSize : 32; // Default
 }
 
-FIntVector2 FChunkData::GetChunkContainingBlockPosition(const UObject* WorldContext,
-                                                        const FIntVector& WorldBlockPosition)
-{
-	FIntVector2 ChunkContainingBlock(WorldBlockPosition.X / GetChunkSize(WorldContext), WorldBlockPosition.Y / GetChunkSize(WorldContext));
-	if (WorldBlockPosition.X < 0)
-	{
-		ChunkContainingBlock.X -= 1;
-	}
-	if (WorldBlockPosition.Y < 0)
-	{
-		ChunkContainingBlock.Y -= 1;
-	}
-	return ChunkContainingBlock;
+int32 FChunkData::GetChunkHeight(const UObject* WorldContext) {
+    UWorldGameInstance* GI = GetWorldGI(WorldContext);
+    return GI ? GI->ChunkHeight : 128; // Default
 }
 
-FIntVector2 FChunkData::GetChunkPosition(const UObject* WorldContext, const FVector& WorldPosition)
-{
-	return GetChunkContainingBlockPosition(WorldContext, GetWorldBlockPosition(WorldContext, WorldPosition));
+float FChunkData::GetBlockSize(const UObject* WorldContext) {
+     UWorldGameInstance* GI = GetWorldGI(WorldContext);
+     return GI ? GI->BlockSize : 100.f;
+ }
+
+ float FChunkData::GetBlockScale(const UObject* WorldContext) {
+      UWorldGameInstance* GI = GetWorldGI(WorldContext);
+      return GI ? GI->BlockScale : 0.5f;
+  }
+
+ float FChunkData::GetScaledBlockSize(const UObject* WorldContext) {
+     return GetBlockSize(WorldContext) * GetBlockScale(WorldContext);
+ }
+
+int32 FChunkData::GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, int32 Z) {
+    int32 Size = GetChunkSize(WorldContext);
+    int32 Height = GetChunkHeight(WorldContext);
+    if (X < 0 || X >= Size || Y < 0 || Y >= Size || Z < 0 || Z >= Height) return -1;
+    return X + (Y * Size) + (Z * Size * Size);
 }
 
-int32 FChunkData::GetWorldSize(const UObject* WorldContext)
-{
-	if (!WorldContext) return 32;
-	
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->WorldSize;
-	}
-	return 32;
-}
+ int32 FChunkData::GetColumnIndex(const UObject* WorldContext, int32 X, int32 Y) {
+     int32 Size = GetChunkSize(WorldContext);
+     if (X < 0 || X >= Size || Y < 0 || Y >= Size) return -1;
+     return X + (Y * Size);
+ }
 
-int32 FChunkData::GetWorldSizeInColumns(const UObject* WorldContext)
-{
-	return GetWorldSize(WorldContext) * GetChunkSize(WorldContext);
-}
+ FIntVector FChunkData::GetLocalBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition) {
+     int32 Size = GetChunkSize(WorldContext);
+     int32 Height = GetChunkHeight(WorldContext);
+     return FIntVector(
+         (WorldBlockPosition.X % Size + Size) % Size,
+         (WorldBlockPosition.Y % Size + Size) % Size,
+         (WorldBlockPosition.Z % Height + Height) % Height
+     );
+ }
 
-int32 FChunkData::GetChunkSize(const UObject* WorldContext)
-{
-	if (!WorldContext) return 16;
-	
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->ChunkSize;
-	}
-	return 16;
-}
+  FIntVector FChunkData::GetWorldBlockPosition(const UObject* WorldContext, const FVector& WorldPosition) {
+      float ScaledSize = GetScaledBlockSize(WorldContext);
+      if (FMath::IsNearlyZero(ScaledSize)) return FIntVector::ZeroValue;
+      return FIntVector(
+          FMath::FloorToInt(WorldPosition.X / ScaledSize),
+          FMath::FloorToInt(WorldPosition.Y / ScaledSize),
+          FMath::FloorToInt(WorldPosition.Z / ScaledSize)
+      );
+  }
 
-int32 FChunkData::GetChunkHeight(const UObject* WorldContext)
-{
-	if (!WorldContext) return 128;
-	
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->ChunkHeight;
-	}
-	return 128;
-}
+ FIntVector2 FChunkData::GetChunkContainingBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition) {
+     int32 Size = GetChunkSize(WorldContext);
+      if (Size == 0) return FIntVector2::ZeroValue;
+     return FIntVector2(
+          FMath::FloorToInt(static_cast<float>(WorldBlockPosition.X) / Size),
+          FMath::FloorToInt(static_cast<float>(WorldBlockPosition.Y) / Size)
+     );
+ }
 
-float FChunkData::GetBlockSize(const UObject* WorldContext)
-{
-	if (!WorldContext) return 100.f;
-	
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->BlockSize;
-	}
-	return 100.f;
-}
-
-float FChunkData::GetBlockScale(const UObject* WorldContext)
-{
-	if (!WorldContext) return 0.5f;
-	
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->BlockScale;
-	}
-	return 0.5f;
-}
-
-float FChunkData::GetScaledBlockSize(const UObject* WorldContext)
-{
-	return GetBlockSize(WorldContext) * GetBlockScale(WorldContext);
-}
-
-float FChunkData::GetWaterThreshold(const UObject* WorldContext)
-{
-	if (!WorldContext) return 10.f;
-
-	UGameInstance* GI = WorldContext->GetWorld()->GetGameInstance();
-	if (UWorldGameInstance* MyGI = Cast<UWorldGameInstance>(GI))
-	{
-		return MyGI->WaterThreshold;
-	}
-	return 10.f;
-}
-
-
-
-
+  FIntVector2 FChunkData::GetChunkPosition(const UObject* WorldContext, const FVector& WorldPosition) {
+      return GetChunkContainingBlockPosition(WorldContext, GetWorldBlockPosition(WorldContext, WorldPosition));
+  }

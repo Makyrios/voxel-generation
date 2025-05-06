@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "BlockLayer.h"
-#include "NoiseOctaveSettings.h"
 #include "BiomeSettings.generated.h"
 
 USTRUCT(BlueprintType)
@@ -13,14 +12,9 @@ struct VOXELGEN_API FBiomeSettings : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, Category = "Biome Settings")
-	FName BiomeName;
-
-	UPROPERTY(EditAnywhere, Category = "Biome Settings")
-	int BaseHeight = 8;
-
-	UPROPERTY(EditAnywhere, Category = "Biome Settings")
-	TArray<FNoiseOctaveSettings> OctaveSettings;
+	EBiomeType BiomeType = EBiomeType::Grassland;
 	
 	UPROPERTY(EditAnywhere, Category = "Biome Settings")
 	TArray<FBlockLayer> Layers;
+	
 };

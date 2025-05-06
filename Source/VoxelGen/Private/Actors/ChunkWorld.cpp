@@ -1,19 +1,23 @@
 #include "Actors/ChunkWorld.h"
 
-#include "FastNoiseWrapper.h"
 #include "Actors/GreedyChunk.h"
 #include "Kismet/GameplayStatics.h"
+#include "Objects/TerrainGenerator.h"
 #include "Structs/ChunkData.h"
 #include "Player/Character/VoxelGenerationCharacter.h"
 
 AChunkWorld::AChunkWorld()
 {
     PrimaryActorTick.bCanEverTick = true;
+
+    TerrainGenerator = CreateDefaultSubobject<UTerrainGenerator>("TerrainGenerator");
 }
 
 void AChunkWorld::BeginPlay()
 {
     Super::BeginPlay();
+
+    ChunkSizeSquared = FChunkData::GetChunkSize(this) * FChunkData::GetChunkSize(this);
     
     InitializeWorld();
 }
@@ -27,6 +31,8 @@ void AChunkWorld::InitializeWorld()
 
     CurrentSpawnChunkDelay = SpawnChunkDelay;
     CurrentClearChunkDelay = ClearChunkDelay;
+    
+    GenerateChunksData();
 }
 
 void AChunkWorld::Tick(float DeltaTime)
@@ -36,6 +42,17 @@ void AChunkWorld::Tick(float DeltaTime)
     UpdateChunks();
     ProcessChunksMeshGeneration(DeltaTime);
     ProcessChunksMeshClear(DeltaTime);
+}
+
+void AChunkWorld::GenerateChunksData()
+{
+    for (int x = 0; x < FChunkData::GetWorldSize(this); ++x)
+    {
+        for (int y = 0; y < FChunkData::GetWorldSize(this); ++y)
+        {
+            LoadChunkAtPosition(FIntVector2(x, y));
+        }
+    }
 }
 
 void AChunkWorld::UpdateChunks()
@@ -66,13 +83,10 @@ void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
         {
             FIntVector2 Coord(x, y);
 
-            if (!ChunksData.Contains(Coord))
-            {
-                LoadChunkAtPosition(Coord);
-            }
-
             if (IsInsideDrawDistance(ChunkCoordinates, x, y))
             {
+                if (!ChunksData.Contains(Coord)) continue;
+                
                 AChunkBase* LoadedChunk = ChunksData[Coord];
                 if (LoadedChunk && !LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
                 {
@@ -106,7 +120,7 @@ bool AChunkWorld::IsPlayerChunkUpdated()
     }
     if (!PlayerCharacter) return false;
 
-    const FIntVector2 PlayerChunk = FChunkData::GetChunkPosition(PlayerCharacter->GetActorLocation());
+    const FIntVector2 PlayerChunk = FChunkData::GetChunkPosition(this, PlayerCharacter->GetActorLocation());
     if (PlayerChunk != CurrentPlayerChunk)
     {
         CurrentPlayerChunk = PlayerChunk;
@@ -117,18 +131,48 @@ bool AChunkWorld::IsPlayerChunkUpdated()
 
 AChunkBase* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 {
+    if (!TerrainGenerator || !TerrainGenerator->IsInitialized()) return nullptr;
+
     FVector ChunkWorldPosition(
-        ChunkCoordinates.X * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
-        ChunkCoordinates.Y * FChunkData::ChunkSize * FChunkData::BlockScaledSize,
+        ChunkCoordinates.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
+        ChunkCoordinates.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
         0.0f);
 
+    // Spawn actor
     AChunkBase* Chunk = GetWorld()->SpawnActor<AChunkBase>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
     if (Chunk)
     {
         Chunk->ChunkPosition = ChunkCoordinates;
-        Chunk->GenerateBlocks(ChunkWorldPosition);
         Chunk->SetParentWorld(this);
+
+        // Generate Column Data 
+        TArray<FChunkColumn> Columns;
+        Columns.SetNum(ChunkSizeSquared);
+
+        FIntVector2 LocalChunkPosition = FChunkData::GetChunkPosition(this, ChunkWorldPosition);
+
+        int32 ChunkSize = FChunkData::GetChunkSize(this);
+
+        for (int x = 0; x < ChunkSize; ++x)
+        {
+            for (int y = 0; y < ChunkSize; ++y)
+            {
+                int GlobalX = LocalChunkPosition.X * FChunkData::GetChunkSize(this) + x;
+                int GlobalY = LocalChunkPosition.Y * FChunkData::GetChunkSize(this) + y;
+
+                // Generate the data for this column
+                FChunkColumn ColumnData = TerrainGenerator->GenerateColumnData(GlobalX, GlobalY);
+
+                // Populate the blocks based on the generated data
+                TerrainGenerator->PopulateColumnBlocks(ColumnData);
+
+                Columns[FChunkData::GetColumnIndex(this, x, y)] = ColumnData;
+            }
+        }
+        Chunk->SetColumns(Columns);
+
         ChunksData.Add(ChunkCoordinates, Chunk);
+        UE_LOG(LogTemp, Verbose, TEXT("Loaded chunk at %d, %d"), ChunkCoordinates.X, ChunkCoordinates.Y);
     }
 
     return Chunk;
@@ -148,7 +192,7 @@ void AChunkWorld::ProcessChunksMeshGeneration(float DeltaTime)
         CurrentSpawnChunkDelay = SpawnChunkDelay;
     }
 
-    PauseGameIfChunksLoadingComplete();
+    UnPauseGameIfChunksLoadingComplete();
 }
 
 void AChunkWorld::ProcessChunksMeshClear(float DeltaTime)
@@ -177,7 +221,7 @@ void AChunkWorld::EnqueueChunkForClearing(AChunkBase* Chunk)
     ChunkClearQueue.Enqueue(Chunk);
 }
 
-void AChunkWorld::PauseGameIfChunksLoadingComplete() const
+void AChunkWorld::UnPauseGameIfChunksLoadingComplete() const
 {
     if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunkGenerationQueue.IsEmpty())
     {

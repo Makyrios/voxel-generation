@@ -6,8 +6,10 @@
 #include "GameFramework/Actor.h"
 #include "ChunkWorld.generated.h"
 
+struct FBiomeWeight;
 class AChunkBase;
 class AVoxelGenerationCharacter;
+class UTerrainGenerator;
 
 UCLASS()
 class VOXELGEN_API AChunkWorld : public AActor
@@ -20,11 +22,9 @@ public:
 
 	const TMap<FIntVector2, AChunkBase*>& GetChunksData() { return ChunksData; }
 
-
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
-	
 
 private:
 	void UpdateChunks();
@@ -34,6 +34,8 @@ private:
 	bool IsPlayerChunkUpdated();
 	AChunkBase* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
 
+	void GenerateChunksData();
+	
 	void ActivateVisibleChunks(const FIntVector2& ChunkCoordinates);
 	bool IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int x, int y);
 	void DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVisibleChunks);
@@ -41,16 +43,19 @@ private:
 	void EnqueueChunkForGeneration(AChunkBase* Chunk);
 	void EnqueueChunkForClearing(AChunkBase* Chunk);
 
-	void PauseGameIfChunksLoadingComplete() const;
+	void UnPauseGameIfChunksLoadingComplete() const;
 
 private:
+	UPROPERTY(EditAnywhere, Category = "Components")
+	TObjectPtr<UTerrainGenerator> TerrainGenerator;
+	
 	TMap<FIntVector2, AChunkBase*> ChunksData;
 	TQueue<AChunkBase*> ChunkGenerationQueue;
 	TQueue<AChunkBase*> ChunkClearQueue;
 
-	UPROPERTY(EditAnywhere, Category = "Chunk World")
+	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
 	float SpawnChunkDelay = 0.02f;
-	UPROPERTY(EditAnywhere, Category = "Chunk World")
+	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
 	float ClearChunkDelay = 0.02f;
 
 	float CurrentSpawnChunkDelay = 0.f;
@@ -62,9 +67,11 @@ private:
 	UPROPERTY()
 	AVoxelGenerationCharacter* PlayerCharacter = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Chunk World")
+	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
 	TSubclassOf<AChunkBase> ChunkClass;
 
-	UPROPERTY(EditAnywhere, Category = "Chunk World")
+	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
 	int DrawDistance = 5;
+
+	float ChunkSizeSquared;
 };

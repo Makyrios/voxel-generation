@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Structs/ChunkMeshData.h"
 #include "GameFramework/Actor.h"
+#include "Structs/ChunkColumn.h"
 #include "Structs/ChunkData.h"
 #include "ChunkBase.generated.h"
 
@@ -12,7 +13,6 @@ enum class EDirection;
 enum class EBlock;
 
 class UProceduralMeshComponent;
-class UTerrainGenerator;
 class UFastNoiseWrapper;
 class AChunkWorld;
 
@@ -28,14 +28,17 @@ public:
 	void RegenerateMeshAsync();
 	void ClearMesh();
 
-	void GenerateBlocks(const FVector& ChunkWorldPosition);
+	void SetColumns(const TArray<FChunkColumn>& NewColumns);
 
 	void SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType);
 	void DestroyBlock(const FIntVector& LocalChunkBlockPosition);
 	
 	void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
+
+	// Position is in local chunk coordinates
 	EBlock GetBlockAtPosition(const FIntVector& Position) const;
 	EBlock GetBlockAtPosition(int X, int Y, int Z) const;
+	
 	bool IsMeshInitialized() const { return bIsMeshInitialized; }
 	
 protected:
@@ -65,16 +68,20 @@ private:
 	void ApplyMesh();
 
 public:
+	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	FIntVector2 ChunkPosition;
+	
 	bool bIsProcessingMesh = false;
 
-protected:
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	TObjectPtr<UProceduralMeshComponent> Mesh;
-	UPROPERTY(EditAnywhere, Category = "Components")
-	TObjectPtr<UTerrainGenerator> TerrainGenerator;
+	// Track if column data (height, biome, blocks) has been generated
+	bool bColumnDataLoaded = false;
 
-	TArray<EBlock> Blocks;
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	TObjectPtr<UProceduralMeshComponent> Mesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk|Columns")
+	TArray<FChunkColumn> ChunkColumns;
 	
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TObjectPtr<UMaterial> Material;
@@ -84,17 +91,8 @@ protected:
 
 	FChunkMeshData ChunkMeshData;
 	int VertexCount = 0;
-
-	const FVector BlockVerticies[8] = {
-		FVector(FChunkData::BlockSize,FChunkData::BlockSize,FChunkData::BlockSize),
-		FVector(FChunkData::BlockSize,0,FChunkData::BlockSize),
-		FVector(FChunkData::BlockSize,0,0),
-		FVector(FChunkData::BlockSize,FChunkData::BlockSize,0),
-		FVector(0,0,FChunkData::BlockSize),
-		FVector(0,FChunkData::BlockSize,FChunkData::BlockSize),
-		FVector(0,FChunkData::BlockSize,0),
-		FVector(0,0,0)
-	};
+	
+	TArray<FVector> BlockVerticies;
 	
 	const int BlockTriangles[24] = {
 		0,1,2,3, // Forward

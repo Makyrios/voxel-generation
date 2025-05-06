@@ -34,6 +34,8 @@ protected:
 	void DestroyBlock();
 	void SpawnBlock();
 
+	void Fly();
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
@@ -67,6 +69,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> DestroyBlockAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> FlyAction;
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Character")
