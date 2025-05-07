@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TerrainData.h"
 #include "VoxelGen/Enums.h"
 #include "ChunkColumn.generated.h"
 
@@ -27,10 +28,10 @@ public:
 	int Y;
 	
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
-	ETemperatureType TemperatureType;
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
-	EHumidityType HumidityType;
+	// UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
+	// ETemperatureType TemperatureType;
+	// UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
+	// EHumidityType HumidityType;
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
 	EBiomeType BiomeType;
 	
@@ -57,19 +58,21 @@ public:
 	
 	// void GenerateBlocks(const FBiomeSettings* BiomeSettings);
 
-	EHumidityType GetHumidityType() const { return HumidityType; }
-	ETemperatureType GetTemperatureType() const { return TemperatureType; }
+	// EHumidityType GetHumidityType() const { return HumidityType; }
+	// ETemperatureType GetTemperatureType() const { return TemperatureType; }
 	EBiomeType GetBiomeType() const { return BiomeType; }
 
-	void SetTemperatureData(float NewTemperature);
-	void SetHumidityData(float NewHumidity);
 	void SetBiomeType(EBiomeType NewBiomeType) { BiomeType = NewBiomeType;}
-	
-	void SetGenerationData(float NewContinentalness, float NewErosion, float NewPeaksValleys)
+	void SetClimateData(float NewTemperature, float NewHumidity)
 	{
-		Continentalness = NewContinentalness;
-		Erosion = NewErosion;
-		PeaksValleys = NewPeaksValleys;
+		Temperature = NewTemperature;
+		Humidity = NewHumidity;
 	}
 	
+	void SetGenerationData(const FTerrainParameterData& NewTerrainData)
+	{
+		Continentalness = NewTerrainData.Continentalness;
+		Erosion = NewTerrainData.Erosion;
+		PeaksValleys = NewTerrainData.PeaksValleys;
+	}
 };

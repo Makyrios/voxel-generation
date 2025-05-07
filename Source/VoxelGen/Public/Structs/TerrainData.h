@@ -23,39 +23,18 @@ struct FBiomeWeight
 };
 
 USTRUCT()
-struct FHeightData
+struct FTemperatureData
 {
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float DeepWater = 0.2f;
+	float ColdestValue = -0.45f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float ShallowWater = 0.4f;	
+	float ColderValue = -0.15f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float Sand = 0.5f;
+	float TemperateValue = 0.2f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float Grass = 0.7f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float Forest = 0.8f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float Rock = 0.9f;
-};
-
-USTRUCT()
-struct FHeatData
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float ColdestValue = 0.05f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float ColderValue = 0.18f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float ColdValue = 0.4f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float WarmValue = 0.6f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float WarmerValue = 0.8f;
+	float WarmValue = 0.55f;
 };
 
 USTRUCT()
@@ -64,35 +43,109 @@ struct FHumidityData
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float DryerValue = 0.27f;
+	float DryestValue = -0.35f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float DryValue = 0.4f;
+	float DryValue = -0.1f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float WetValue = 0.6f;
+	float MediumValue = 0.1f;
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	float WetterValue = 0.8f;
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	float WettestValue = 0.9f;
+	float WetValue = 0.3f;
 };
 
 USTRUCT()
-struct FTerrainNoises
+struct FContinentalnessData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float MushroomFieldsValue = -0.8f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float DeepOceanValue = -0.45;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float OceanValue = -0.13f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float CoastValue = 0.05f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float NearInlandValue = 0.35f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float MidInlandValue = 0.8f;
+};
+
+USTRUCT()
+struct FErosionData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E0Value = -0.78f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E1Value = -0.375f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E2Value = -0.2225f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E3Value = 0.05f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E4Value = 0.45f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float E5Value = 0.65f;
+};
+
+USTRUCT()
+struct FPeaksValleysData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float ValleysValue = -0.85f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float LowValue = -0.6f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float MidValue = 0.2f;
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float HighValue = 0.7f;
+};
+
+USTRUCT()
+struct FTerrainParameterData
 {
 	GENERATED_BODY()
 
 	float Continentalness;
 	float Erosion;
+	float Weirdness;
 	float PeaksValleys;
 
-	FTerrainNoises() = default;
+	FTerrainParameterData() = default;
 
-	FTerrainNoises(float InContinentalness, float InErosion, float InPeaksValleys)
-		: Continentalness(InContinentalness), Erosion(InErosion), PeaksValleys(InPeaksValleys) {}
+	FTerrainParameterData(float InContinentalness, float InErosion, float InWeirdness, float InPeaksValleys)
+		: Continentalness(InContinentalness), Erosion(InErosion), Weirdness(InWeirdness), PeaksValleys(InPeaksValleys) {}
 };
 
+USTRUCT()
+struct FCategorizedBiomeInputs
+{
+	GENERATED_BODY()
+	
+	ETemperatureType Temperature;
+	EHumidityType Humidity;
+	EContinentalnessType Continentalness;
+	EErosionType Erosion;
+	EPVType PV;
+	float WeirdnessValue; // Raw weirdness value [-1, 1], for checks like W > 0
+
+	FCategorizedBiomeInputs(
+		ETemperatureType T, EHumidityType H, EContinentalnessType C,
+		EErosionType E, EPVType P, float W)
+		: Temperature(T), Humidity(H), Continentalness(C), Erosion(E), PV(P), WeirdnessValue(W) {}
+
+	FCategorizedBiomeInputs() = default;
+};
+
+
+template<typename T>
 struct FMapData
 {
-	TArray<TArray<float>> Data;
+	TArray<TArray<T>> Data;
 	int Width;
 	int Length;
 
@@ -107,47 +160,13 @@ struct FMapData
 		}
 	}
 
-	float GetData(int x, int y) const
+	T GetData(int x, int y) const
 	{
 		return Data[x][y];
 	}
 
-	void SetData(int x, int y, float Value)
+	void SetData(int x, int y, T Value)
 	{
 		Data[x][y] = Value;
-	}
-	
-	// Normalize data map to [0, 1] range
-	void NormalizeData()
-	{
-		float MinVal, MaxVal;
-		GetDataMinMax(MinVal, MaxVal);
-		const float Range = MaxVal - MinVal;
-		if (Width == 0 || Length == 0 || FMath::IsNearlyZero(Range)) return;
-
-		for (int x = 0; x < Width; ++x)
-		{
-			for (int y = 0; y < Length; ++y)
-			{
-				Data[x][y] = (Data[x][y] - MinVal) / Range;
-			}
-		}
-	}
-
-	void GetDataMinMax(float& OutMin, float& OutMax) const
-	{
-		OutMin = TNumericLimits<float>::Max();
-		OutMax = TNumericLimits<float>::Min();
-		if (Width == 0 || Length == 0) return;
-
-		for (int x = 0; x < Width; ++x)
-		{
-			for (int y = 0; y < Length; ++y)
-			{
-				const float Val = Data[x][y];
-				if (Val < OutMin) OutMin = Val;
-				if (Val > OutMax) OutMax = Val;
-			}
-		}
 	}
 };

@@ -4,7 +4,7 @@ Intermediate
 Saved
 Build/Windows
 Platforms/HoloLens
-Content/__ExternalActors__
+Content/__ExternalActors__/**
 
 .vsconfig
 .vscode
