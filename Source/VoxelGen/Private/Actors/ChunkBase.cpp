@@ -7,6 +7,7 @@
 #include "Actors/ChunkWorld.h"
 #include "Structs/ChunkData.h"
 #include "Objects/FChunkMeshLoaderAsync.h"
+#include "Structs/BlockSettings.h"
 #include "Structs/ChunkColumn.h"
 #include "VoxelGen/Enums.h"
 
@@ -76,23 +77,37 @@ FIntVector AChunkBase::GetPositionInDirection(EDirection Direction, const FIntVe
 
 int AChunkBase::GetTextureIndex(EBlock BlockType, const FVector& Normal) const
 {
-	switch (BlockType)
+	const FBlockSettings* Data = GetBlockData(BlockType);
+	if (!Data) return 255; // Default/Error texture
+
+	// Simplified example, assumes your texture array matches this order conceptually
+	if (Normal == FVector::UpVector) return Data->TextureData.TopFaceTexture;
+	if (Normal == FVector::DownVector) return Data->TextureData.BottomFaceTexture;
+	return Data->TextureData.SideFaceTexture;
+}
+
+const FBlockSettings* AChunkBase::GetBlockData(EBlock BlockType) const
+{
+	if (!BlockDataTable)
 	{
-	case EBlock::Grass:
-		if (Normal == FVector::UpVector) return 0;
-		if (Normal == FVector::DownVector) return 2;
-		return 1;
-	case EBlock::Dirt: return 2;
-	case EBlock::Stone: return 3;
-	case EBlock::Snow:
-		if (Normal == FVector::UpVector) return 4;
-		if (Normal == FVector::DownVector) return 3;
-		return 5;
-	case EBlock::Sand: return 6;
-	case EBlock::Water: return 7;
-		
-	default: return 255;
+		UE_LOG(LogTemp, Warning, TEXT("BlockDataTable is not set in ChunkBase!"));
+		return nullptr;
 	}
+	
+	const FString EnumString = UEnum::GetValueAsString(BlockType);
+	const FName RowName = FName(EnumString.RightChop(EnumString.Find(TEXT("::")) + 2));
+	
+	FBlockSettings* FoundRow = BlockDataTable->FindRow<FBlockSettings>(RowName, TEXT("Looking up BlockData"));
+	if (!FoundRow)
+	{
+		// Fallback for Air or undefined blocks
+		static const FBlockSettings AirDataDefault;
+		if (BlockType == EBlock::Air) return &AirDataDefault;
+
+		UE_LOG(LogTemp, Warning, TEXT("BlockData not found for type: %s"), *RowName.ToString());
+		return nullptr;
+	}
+	return FoundRow;
 }
 
 bool AChunkBase::CheckIsAir(const FIntVector& Position) const

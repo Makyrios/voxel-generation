@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Structs/ChunkMeshData.h"
 #include "GameFramework/Actor.h"
+#include "Structs/BlockSettings.h"
 #include "Structs/ChunkColumn.h"
 #include "Structs/ChunkData.h"
 #include "ChunkBase.generated.h"
@@ -47,6 +48,7 @@ protected:
 	virtual void GenerateMesh() PURE_VIRTUAL(&AChunkBase::GenerateMesh);
 
 	int GetTextureIndex(EBlock BlockType, const FVector& Normal) const;
+	const FBlockSettings* GetBlockData(EBlock BlockType) const;
 
 	bool CheckIsAir(const FIntVector& Position) const;
 	bool CheckIsAir(int X, int Y, int Z) const;
@@ -77,6 +79,9 @@ public:
 	bool bColumnDataLoaded = false;
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chunk|Data")
+	TObjectPtr<UDataTable> BlockDataTable;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 

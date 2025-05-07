@@ -19,7 +19,19 @@ enum class EBlock
 	Stone UMETA(DisplayName = "Stone"),
 	Snow UMETA(DisplayName = "Snow"),
 	Sand UMETA(DisplayName = "Sand"),
-	Water UMETA(DisplayName = "Water")
+	Water UMETA(DisplayName = "Water"),
+	OakLeaves UMETA(DisplayName = "Oak Leaves"),
+	OakWood UMETA(DisplayName = "Oak Wood"),
+	Redstone UMETA(DisplayName = "Redstone"),
+	Redsand UMETA(DisplayName = "Red Sand")
+};
+
+UENUM()
+enum class EBlockMaterialType
+{
+	Opaque UMETA(DisplayName = "Opaque"),
+	Transparent UMETA(DisplayName = "Transparent"),
+	Masked UMETA(DisplayName = "Masked")
 };
 
 UENUM(BlueprintType)
