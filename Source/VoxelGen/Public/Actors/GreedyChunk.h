@@ -10,18 +10,23 @@ UCLASS()
 class VOXELGEN_API AGreedyChunk final : public AChunkBase
 {
 	GENERATED_BODY()
-
+	
 	struct FMask
 	{
-		EBlock Block;
-		int Normal; // Direction of the face (1 for positive, -1 for negative, 0 for none)
+		// const FBlockSettings* BlockProperties = nullptr;
+		EBlock Block = EBlock::Air;
+		int8 Normal = 0; // -1 or 1 for direction relative to sweep
+
+		FMask() = default;
+		FMask(EBlock InBlock, int8 InNormal)
+			: Block(InBlock), Normal(InNormal) {}
 	};
 
 private:
 	virtual void GenerateMesh() override;
 	
-	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height,
-		FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
+	void CreateQuad(const FMask& Mask, const FIntVector& AxisMask, int Width, int Height,
+		const FIntVector& V1, const FIntVector& V2, const FIntVector& V3, const FIntVector& V4);
 	
-	bool CompareMask(FMask M1, FMask M2) const;
+	bool CompareMask(const FMask& M1, const FMask& M2) const;
 };
