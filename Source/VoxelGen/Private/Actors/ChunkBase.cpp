@@ -6,10 +6,11 @@
 #include "ProceduralMeshComponent.h"
 #include "Actors/ChunkWorld.h"
 #include "Structs/ChunkData.h"
-#include "Objects/FChunkMeshLoaderAsync.h"
+#include "Objects/ChunkMeshLoaderAsync.h"
 #include "Structs/BlockSettings.h"
 #include "Structs/ChunkColumn.h"
 #include "VoxelGen/Enums.h"
+
 
 AChunkBase::AChunkBase()
 {
@@ -50,46 +51,44 @@ void AChunkBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AChunkBase::ApplyMesh()
 {
-	AsyncTask(ENamedThreads::GameThread, [&]()
+	if (!IsValid(Mesh))
 	{
-		if (!IsValid(Mesh))
-		{
-			return;
-		}
+		return;
+	}
 
-		Mesh->ClearAllMeshSections();
+	Mesh->ClearAllMeshSections();
 
-		// Create section for Opaque blocks (Material Slot 0)
-		if (OpaqueChunkMeshData.Vertices.Num() > 0 && OpaqueMaterial)
-		{
-			Mesh->CreateMeshSection(0, OpaqueChunkMeshData.Vertices, OpaqueChunkMeshData.Triangles,
-									TArray<FVector>(), OpaqueChunkMeshData.UV, OpaqueChunkMeshData.Colors,
-									TArray<FProcMeshTangent>(), true);
-			Mesh->SetMaterial(0, OpaqueMaterial);
-		}
+	// Create section for Opaque blocks (Material Slot 0)
+	if (OpaqueChunkMeshData.Vertices.Num() > 0 && OpaqueMaterial)
+	{
+		Mesh->CreateMeshSection(0, OpaqueChunkMeshData.Vertices, OpaqueChunkMeshData.Triangles,
+								TArray<FVector>(), OpaqueChunkMeshData.UV, OpaqueChunkMeshData.Colors,
+								TArray<FProcMeshTangent>(), true);
+		Mesh->SetMaterial(0, OpaqueMaterial);
+	}
 
-		// Create section for Translucent blocks (Material Slot 1)
-		if (WaterChunkMeshData.Vertices.Num() > 0 && WaterMaterial)
-		{
-			Mesh->CreateMeshSection(1, WaterChunkMeshData.Vertices, WaterChunkMeshData.Triangles,
-									TArray<FVector>(), WaterChunkMeshData.UV, WaterChunkMeshData.Colors,
-									TArray<FProcMeshTangent>(), false);
-			Mesh->SetMaterial(1, WaterMaterial);
-		}
+	// Create section for Translucent blocks (Material Slot 1)
+	if (WaterChunkMeshData.Vertices.Num() > 0 && WaterMaterial)
+	{
+		Mesh->CreateMeshSection(1, WaterChunkMeshData.Vertices, WaterChunkMeshData.Triangles,
+								TArray<FVector>(), WaterChunkMeshData.UV, WaterChunkMeshData.Colors,
+								TArray<FProcMeshTangent>(), false);
+		Mesh->SetMaterial(1, WaterMaterial);
+	}
 
-		// Create section for Masked blocks (Material Slot 2)
-		if (MaskedChunkMeshData.Vertices.Num() > 0 && MaskedMaterial)
-		{
-			Mesh->CreateMeshSection(2, MaskedChunkMeshData.Vertices, MaskedChunkMeshData.Triangles,
-									TArray<FVector>(), MaskedChunkMeshData.UV, MaskedChunkMeshData.Colors,
-									TArray<FProcMeshTangent>(), true);
-			Mesh->SetMaterial(2, MaskedMaterial);
-		}
+	// Create section for Masked blocks (Material Slot 2)
+	if (MaskedChunkMeshData.Vertices.Num() > 0 && MaskedMaterial)
+	{
+		Mesh->CreateMeshSection(2, MaskedChunkMeshData.Vertices, MaskedChunkMeshData.Triangles,
+								TArray<FVector>(), MaskedChunkMeshData.UV, MaskedChunkMeshData.Colors,
+								TArray<FProcMeshTangent>(), true);
+		Mesh->SetMaterial(2, MaskedMaterial);
+	}
 
-		bCanChangeBlocks = true;
-		bIsProcessingMesh = false;
-		bIsMeshInitialized = true;
-	});
+	bCanChangeBlocks = true;
+	bIsProcessingMesh = false;
+	bIsMeshInitialized = true;
+
 }
 
 FIntVector AChunkBase::GetPositionInDirection(EDirection Direction, const FIntVector& Position) const
@@ -170,7 +169,11 @@ void AChunkBase::RegenerateMesh()
 	MaskedVertexCount = 0;
 
 	GenerateMesh();
-	ApplyMesh();
+	AsyncTask(ENamedThreads::GameThread, [&]()
+	{
+		ApplyMesh();
+		ParentWorld->NotifyMeshTaskCompleted();
+	});
 }
 
 void AChunkBase::RegenerateMeshAsync()

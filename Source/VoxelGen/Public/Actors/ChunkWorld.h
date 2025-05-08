@@ -20,7 +20,9 @@ public:
 	AChunkWorld();
 	void InitializeWorld();
 
-	const TMap<FIntVector2, AChunkBase*>& GetChunksData() { return ChunksData; }
+	const TMap<FIntVector2, AChunkBase*>& GetChunksData() const { return ChunksData; }
+
+	void NotifyMeshTaskCompleted() { --RunningMeshTasks; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -43,6 +45,8 @@ private:
 
 	void EnqueueChunkForGeneration(AChunkBase* Chunk);
 	void EnqueueChunkForClearing(AChunkBase* Chunk);
+	
+	void SortVisibleChunksByDistance();
 
 	void UnPauseGameIfChunksLoadingComplete() const;
 
@@ -51,16 +55,18 @@ private:
 	TObjectPtr<UTerrainGenerator> TerrainGenerator;
 	
 	TMap<FIntVector2, AChunkBase*> ChunksData;
-	TQueue<AChunkBase*> ChunkGenerationQueue;
+	TMap<FIntVector2, AChunkBase*> ChunksPendingGenerationMap;
+	
 	TQueue<AChunkBase*> ChunkClearQueue;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
-	float SpawnChunkDelay = 0.02f;
-	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
 	float ClearChunkDelay = 0.02f;
-
-	float CurrentSpawnChunkDelay = 0.f;
+	
 	float CurrentClearChunkDelay = 0.f;
+	
+	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World", meta = (ClampMin = "1"))
+	int32 MaxConcurrentMeshTasks = FPlatformMisc::NumberOfCores();
+	std::atomic<int32> RunningMeshTasks = 0;
 
 	FIntVector2 CurrentPlayerChunk;
 	TArray<FIntVector2> VisibleChunks;
