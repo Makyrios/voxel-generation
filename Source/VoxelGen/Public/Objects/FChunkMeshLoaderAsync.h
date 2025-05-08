@@ -6,6 +6,7 @@
 
 class FChunkMeshLoaderAsync : public FNonAbandonableTask
 {
+	
 public:
 	FChunkMeshLoaderAsync(AChunkBase* InChunk);
 
@@ -13,5 +14,5 @@ public:
 	void DoWork();
 
 private:
-	AChunkBase* Chunk;
+	TWeakObjectPtr<AChunkBase> ChunkPtr;
 };

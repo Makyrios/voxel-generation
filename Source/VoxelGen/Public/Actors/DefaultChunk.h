@@ -20,7 +20,7 @@ protected:
 	virtual void GenerateMesh() override;
 
 private:
-	void CreateFace(EDirection Direction, const FIntVector& Position);
+	void CreateFace(EDirection Direction, const FIntVector& Position, EBlock BlockType, const FBlockSettings* BlockProperties);
 	TArray<FVector> GetFaceVerticies(EDirection Direction, const FVector& WorldPosition) const;
 	FVector GetNormal(EDirection Direction);
 };

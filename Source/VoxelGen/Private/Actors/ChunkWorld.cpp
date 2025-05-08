@@ -22,6 +22,14 @@ void AChunkWorld::BeginPlay()
     InitializeWorld();
 }
 
+void AChunkWorld::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+    
+    ChunkGenerationQueue.Empty();
+    ChunkClearQueue.Empty();
+}
+
 void AChunkWorld::InitializeWorld()
 {
     PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));

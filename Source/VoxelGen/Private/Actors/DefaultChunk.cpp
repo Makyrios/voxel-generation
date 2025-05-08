@@ -18,40 +18,111 @@ void ADefaultChunk::BeginPlay()
 
 void ADefaultChunk::GenerateMesh()
 {
-	for (int x = 0; x < FChunkData::GetChunkSize(this); ++x)
-	{
-		for (int y = 0; y < FChunkData::GetChunkSize(this); ++y)
-		{
-			for (int z = 0; z < FChunkData::GetChunkHeight(this); ++z)
-			{
-				if (GetBlockAtPosition(FIntVector(x, y, z)) == EBlock::Air) continue;
-				
-				for (const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left, EDirection::Up, EDirection::Down })
-				{
-					FIntVector Position(x, y, z);
-					if (CheckIsAir(GetPositionInDirection(Direction, Position)))
-					{
-						CreateFace(Direction, Position);
-					}
-				}
-			}
-		}
-	}
+	int32 ChunkSize = FChunkData::GetChunkSize(this);
+    int32 ChunkHeight = FChunkData::GetChunkHeight(this);
+
+    for (int x = 0; x < ChunkSize; ++x)
+    {
+        for (int y = 0; y < ChunkSize; ++y)
+        {
+            for (int z = 0; z < ChunkHeight; ++z)
+            {
+                FIntVector CurrentBlockPos(x, y, z);
+                EBlock CurrentBlockType = GetBlockAtPosition(CurrentBlockPos);
+                const FBlockSettings* CurrentBlockProperties = GetBlockData(CurrentBlockType);
+
+                // Skip processing for Air blocks themselves or blocks with no defined properties
+                if (CurrentBlockType == EBlock::Air || !CurrentBlockProperties)
+                {
+                    continue;
+                }
+
+                // Iterate through 6 directions
+                for (int i = 0; i < 6; ++i)
+                {
+                    EDirection Direction = static_cast<EDirection>(i);
+                    FIntVector NeighborPos = GetPositionInDirection(Direction, CurrentBlockPos);
+
+                    // Use the FBlockSettings of the neighbor to determine if it's "see-through"
+                    if (ShouldRenderFace(NeighborPos))
+                    {
+                        bool bActuallyDrawThisFace = true;
+                    	
+                        // Apply culling rules
+                        // Cull internal faces of identical transparent blocks (water)
+                        if (CurrentBlockProperties->MaterialType == EBlockMaterialType::Transparent)
+                        {
+                            EBlock NeighborTypeIfActuallyChecked = GetBlockAtPosition(NeighborPos);
+                            const FBlockSettings* NeighborPropsIfActuallyChecked = GetBlockData(NeighborTypeIfActuallyChecked);
+
+                            if (NeighborPropsIfActuallyChecked &&
+                                NeighborPropsIfActuallyChecked->MaterialType == EBlockMaterialType::Transparent &&
+                                CurrentBlockType == NeighborTypeIfActuallyChecked)
+                            {
+                                bActuallyDrawThisFace = false;
+                            }
+                        }
+
+                    	// Leaves?
+
+                        if (bActuallyDrawThisFace)
+                        {
+                            CreateFace(Direction, CurrentBlockPos, CurrentBlockType, CurrentBlockProperties);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
-void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position)
+void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position, EBlock BlockType, const FBlockSettings* BlockProperties)
 {
-	FVector WorldPosition(Position);
-	WorldPosition *= FChunkData::GetScaledBlockSize(this);
-	ChunkMeshData.Vertices.Append(GetFaceVerticies(Direction, WorldPosition));
-	ChunkMeshData.UV.Append({ FVector2D(1, 0), FVector2D(0, 0), FVector2D(0, 1), FVector2D(1, 1) });
-	ChunkMeshData.Triangles.Append({ VertexCount + 3, VertexCount + 2, VertexCount, VertexCount + 2, VertexCount + 1, VertexCount });
+    if (!BlockProperties) return;
 
-	FVector Normal = GetNormal(Direction);
-	const int TextureIndex = GetTextureIndex(GetBlockAtPosition(Position), Normal);
-	const FColor Color(0, 0, 0, TextureIndex);
-	ChunkMeshData.Colors.Append({Color, Color, Color, Color});
-	VertexCount += 4;
+    FChunkMeshData& TargetMeshData = GetMeshDataForBlock(BlockType);
+    int& TargetVertexCount = GetVertexCountForBlock(BlockType);
+
+    FVector WorldPositionOffset(Position);
+    WorldPositionOffset *= FChunkData::GetScaledBlockSize(this);
+
+    TargetMeshData.Vertices.Append(GetFaceVerticies(Direction, WorldPositionOffset));
+
+    // Standard UVs for a quad
+    TargetMeshData.UV.Add(FVector2D(1, 0));
+    TargetMeshData.UV.Add(FVector2D(0, 0));
+    TargetMeshData.UV.Add(FVector2D(0, 1));
+    TargetMeshData.UV.Add(FVector2D(1, 1));
+
+	// Triangles
+    TargetMeshData.Triangles.Add(TargetVertexCount + 3);
+    TargetMeshData.Triangles.Add(TargetVertexCount + 2);
+    TargetMeshData.Triangles.Add(TargetVertexCount + 0);
+
+    TargetMeshData.Triangles.Add(TargetVertexCount + 2);
+    TargetMeshData.Triangles.Add(TargetVertexCount + 1);
+    TargetMeshData.Triangles.Add(TargetVertexCount + 0);
+
+
+    FVector Normal = GetNormal(Direction);
+    // Get texture index from FBlockSettings based on face normal
+    int TextureIndexValue = 255; // Default/error texture
+    if (Normal == FVector::UpVector) TextureIndexValue = BlockProperties->TextureData.TopFaceTexture;
+    else if (Normal == FVector::DownVector) TextureIndexValue = BlockProperties->TextureData.BottomFaceTexture;
+    else TextureIndexValue = BlockProperties->TextureData.SideFaceTexture;
+
+    const FColor Color(0, 0, 0, TextureIndexValue);
+    TargetMeshData.Colors.Add(Color);
+    TargetMeshData.Colors.Add(Color);
+    TargetMeshData.Colors.Add(Color);
+    TargetMeshData.Colors.Add(Color);
+
+    TargetMeshData.Normals.Add(Normal);
+    TargetMeshData.Normals.Add(Normal);
+    TargetMeshData.Normals.Add(Normal);
+    TargetMeshData.Normals.Add(Normal);
+
+    TargetVertexCount += 4;
 }
 
 FVector ADefaultChunk::GetNormal(EDirection Direction)

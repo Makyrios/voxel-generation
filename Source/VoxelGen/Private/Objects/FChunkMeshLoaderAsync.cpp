@@ -2,7 +2,7 @@
 
 #include "Actors/ChunkBase.h"
 
-FChunkMeshLoaderAsync::FChunkMeshLoaderAsync(AChunkBase* InChunk) : Chunk(InChunk)
+FChunkMeshLoaderAsync::FChunkMeshLoaderAsync(AChunkBase* InChunk) : ChunkPtr(InChunk)
 {
 }
 
@@ -13,8 +13,12 @@ TStatId FChunkMeshLoaderAsync::GetStatId()
 
 void FChunkMeshLoaderAsync::DoWork()
 {
-	if (Chunk)
+	if (AChunkBase* Chunk = ChunkPtr.Get())
 	{
-		Chunk->RegenerateMesh();
+		if (Chunk->IsValidLowLevel() && !Chunk->IsPendingKillPending() && Chunk->GetWorld())
+		{
+			Chunk->RegenerateMesh();
+			
+		}
 	}
 }

@@ -40,23 +40,56 @@ void AChunkBase::BeginPlay()
 	ChunkColumns.SetNum(FChunkData::GetChunkSize(this) * FChunkData::GetChunkSize(this));
 }
 
+void AChunkBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	// Cancel any ongoing mesh processing
+	bIsProcessingMesh = false;
+}
+
 void AChunkBase::ApplyMesh()
 {
 	AsyncTask(ENamedThreads::GameThread, [&]()
 	{
-		if (!Mesh) return;
-		Mesh->CreateMeshSection(0, ChunkMeshData.Vertices, ChunkMeshData.Triangles, TArray<FVector>(), ChunkMeshData.UV, ChunkMeshData.Colors, TArray<FProcMeshTangent>(), true);
-
-		if (Material)
+		if (!IsValid(Mesh))
 		{
-			Mesh->SetMaterial(0, Material);
+			return;
+		}
+
+		Mesh->ClearAllMeshSections();
+
+		// Create section for Opaque blocks (Material Slot 0)
+		if (OpaqueChunkMeshData.Vertices.Num() > 0 && OpaqueMaterial)
+		{
+			Mesh->CreateMeshSection(0, OpaqueChunkMeshData.Vertices, OpaqueChunkMeshData.Triangles,
+									TArray<FVector>(), OpaqueChunkMeshData.UV, OpaqueChunkMeshData.Colors,
+									TArray<FProcMeshTangent>(), true);
+			Mesh->SetMaterial(0, OpaqueMaterial);
+		}
+
+		// Create section for Translucent blocks (Material Slot 1)
+		if (WaterChunkMeshData.Vertices.Num() > 0 && WaterMaterial)
+		{
+			Mesh->CreateMeshSection(1, WaterChunkMeshData.Vertices, WaterChunkMeshData.Triangles,
+									TArray<FVector>(), WaterChunkMeshData.UV, WaterChunkMeshData.Colors,
+									TArray<FProcMeshTangent>(), false);
+			Mesh->SetMaterial(1, WaterMaterial);
+		}
+
+		// Create section for Masked blocks (Material Slot 2)
+		if (MaskedChunkMeshData.Vertices.Num() > 0 && MaskedMaterial)
+		{
+			Mesh->CreateMeshSection(2, MaskedChunkMeshData.Vertices, MaskedChunkMeshData.Triangles,
+									TArray<FVector>(), MaskedChunkMeshData.UV, MaskedChunkMeshData.Colors,
+									TArray<FProcMeshTangent>(), true);
+			Mesh->SetMaterial(2, MaskedMaterial);
 		}
 
 		bCanChangeBlocks = true;
 		bIsProcessingMesh = false;
 		bIsMeshInitialized = true;
 	});
-	
 }
 
 FIntVector AChunkBase::GetPositionInDirection(EDirection Direction, const FIntVector& Position) const
@@ -110,20 +143,32 @@ const FBlockSettings* AChunkBase::GetBlockData(EBlock BlockType) const
 	return FoundRow;
 }
 
-bool AChunkBase::CheckIsAir(const FIntVector& Position) const
+bool AChunkBase::ShouldRenderFace(const FIntVector& Position) const
 {
-	return GetBlockAtPosition(Position) == EBlock::Air;
+	EBlock Block = GetBlockAtPosition(Position);
+	if (Block == EBlock::Air) return true;
+
+	const FBlockSettings* Data = GetBlockData(Block);
+	// A block is considered "air" for culling purposes if it's not solid OR if it's transparent.
+	return (Data && (!Data->bIsSolid || Data->bIsTransparent));
 }
 
-bool AChunkBase::CheckIsAir(int X, int Y, int Z) const
+bool AChunkBase::ShouldRenderFace(int X, int Y, int Z) const
 {
 	return GetBlockAtPosition(FIntVector(X, Y, Z)) == EBlock::Air;
 }
 
 void AChunkBase::RegenerateMesh()
 {
-	ChunkMeshData.Clear();
-	VertexCount = 0;
+	// Clear all mesh data stores
+	OpaqueChunkMeshData.Clear();
+	WaterChunkMeshData.Clear();
+	MaskedChunkMeshData.Clear();
+
+	OpaqueVertexCount = 0;
+	WaterVertexCount = 0;
+	MaskedVertexCount = 0;
+
 	GenerateMesh();
 	ApplyMesh();
 }
@@ -151,6 +196,11 @@ EBlock AChunkBase::GetBlockAtPosition(const FIntVector& Position) const
 	if (IsWithinChunkBounds(Position))
 	{
 		int32 ColumnIndex = FChunkData::GetColumnIndex(this, Position.X, Position.Y);
+		if (ColumnIndex < 0 || ColumnIndex >= ChunkColumns.Num())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Invalid column index: %d"), ColumnIndex);
+			return EBlock::Air; // Invalid column index
+		}
 		return ChunkColumns[ColumnIndex].Blocks[Position.Z];
 	}
 	
@@ -207,7 +257,7 @@ void AChunkBase::SetBlockAtPosition(const FIntVector& Position, EBlock BlockType
 
 		if (!bIsMeshInitialized) return;
 		// Update the adjacent chunk only when destroying block to prevent updating the whole chunk mesh when spawning a block
-		if (BlockType == EBlock::Air)
+		if (BlockType == EBlock::Air || BlockType == EBlock::Water)
 		{
 			UpdateAdjacentChunk(Position);
 		}
@@ -296,9 +346,10 @@ bool AChunkBase::IsWithinVerticalBounds(const FIntVector& Position) const
 
 void AChunkBase::SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType)
 {
-	if (!bCanChangeBlocks) return;
-	
-	if (GetBlockAtPosition(LocalChunkBlockPosition) != EBlock::Air) return;
+ 	if (!bCanChangeBlocks) return;
+
+	EBlock CurrentBlockType = GetBlockAtPosition(LocalChunkBlockPosition);
+	if (CurrentBlockType != EBlock::Air && CurrentBlockType != EBlock::Water) return;
 
 	bCanChangeBlocks = false;
 	SetBlockAtPosition(LocalChunkBlockPosition, BlockType);
@@ -316,7 +367,44 @@ void AChunkBase::DestroyBlock(const FIntVector& LocalChunkBlockPosition)
 	if (!IsWithinChunkBounds(LocalChunkBlockPosition)) return;
 
 	bCanChangeBlocks = false;
-	SetBlockAtPosition(LocalChunkBlockPosition, EBlock::Air);
+	if (GetBlockAtPosition(GetPositionInDirection(EDirection::Up, LocalChunkBlockPosition)) == EBlock::Water
+		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Left, LocalChunkBlockPosition)) == EBlock::Water
+		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Right, LocalChunkBlockPosition)) == EBlock::Water
+		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Forward, LocalChunkBlockPosition)) == EBlock::Water
+		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Backward, LocalChunkBlockPosition)) == EBlock::Water)
+	{
+		SetBlockAtPosition(LocalChunkBlockPosition, EBlock::Water);
+	}
+	else
+	{
+		SetBlockAtPosition(LocalChunkBlockPosition, EBlock::Air);
+	}
 	
 	RegenerateMeshAsync();
+}
+
+FChunkMeshData& AChunkBase::GetMeshDataForBlock(EBlock BlockType)
+{
+	switch (BlockType)
+	{
+	case EBlock::Water:
+		return WaterChunkMeshData;
+	case EBlock::OakLeaves:
+		return MaskedChunkMeshData;
+	default:
+		return OpaqueChunkMeshData;
+	}
+}
+
+int& AChunkBase::GetVertexCountForBlock(EBlock BlockType)
+{
+	switch (BlockType)
+	{
+	case EBlock::Water:
+		return WaterVertexCount;
+	case EBlock::OakLeaves:
+		return MaskedVertexCount;
+	default:
+		return OpaqueVertexCount;
+	}
 }

@@ -44,14 +44,15 @@ public:
 	
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	virtual void GenerateMesh() PURE_VIRTUAL(&AChunkBase::GenerateMesh);
 
 	int GetTextureIndex(EBlock BlockType, const FVector& Normal) const;
 	const FBlockSettings* GetBlockData(EBlock BlockType) const;
 
-	bool CheckIsAir(const FIntVector& Position) const;
-	bool CheckIsAir(int X, int Y, int Z) const;
+	bool ShouldRenderFace(const FIntVector& Position) const;
+	bool ShouldRenderFace(int X, int Y, int Z) const;
 
 	FIntVector GetPositionInDirection(EDirection Direction, const FIntVector& Position) const;
 	void SetBlockAtPosition(const FIntVector& Position, EBlock BlockType);
@@ -66,6 +67,9 @@ protected:
 	void UpdateAdjacentChunk(const FIntVector& LocalEdgeBlockPosition) const;
 	TArray<FIntVector> GetEdgeOffsets(const FIntVector& LocalEdgeBlockPosition) const;
 
+	FChunkMeshData& GetMeshDataForBlock(EBlock BlockType);
+	int& GetVertexCountForBlock(EBlock BlockType);
+
 private:
 	void ApplyMesh();
 
@@ -74,9 +78,14 @@ public:
 	FIntVector2 ChunkPosition;
 	
 	bool bIsProcessingMesh = false;
-
-	// Track if column data (height, biome, blocks) has been generated
-	bool bColumnDataLoaded = false;
+	
+	FChunkMeshData OpaqueChunkMeshData;
+	FChunkMeshData WaterChunkMeshData;
+	FChunkMeshData MaskedChunkMeshData;
+	
+	int OpaqueVertexCount = 0;
+	int WaterVertexCount = 0;
+	int MaskedVertexCount = 0;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chunk|Data")
@@ -88,14 +97,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk|Columns")
 	TArray<FChunkColumn> ChunkColumns;
 	
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	TObjectPtr<UMaterial> Material;
+	// Material properties
+	UPROPERTY(EditAnywhere, Category = "Chunk|Materials")
+	TObjectPtr<UMaterialInterface> OpaqueMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk|Materials")
+	TObjectPtr<UMaterialInterface> WaterMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk|Materials")
+	TObjectPtr<UMaterialInterface> MaskedMaterial;
 
 	UPROPERTY()
 	AChunkWorld* ParentWorld;
-
-	FChunkMeshData ChunkMeshData;
-	int VertexCount = 0;
 	
 	TArray<FVector> BlockVerticies;
 	
