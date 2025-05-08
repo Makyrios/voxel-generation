@@ -36,6 +36,9 @@ protected:
 
 	void Fly();
 
+	void Ascend();
+	void Descend();
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
@@ -73,9 +76,17 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> FlyAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> AscendAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> DescendAction;
+
 private:
 	UPROPERTY(EditAnywhere, Category = "Character")
 	float InteractionRange = 1000;
+
+	UPROPERTY(EditAnywhere, Category = "Character Movement: Flying")
+	float VerticalMoveSpeed = 3000.f;
 
 };
 

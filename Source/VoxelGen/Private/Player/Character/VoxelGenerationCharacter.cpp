@@ -60,6 +60,9 @@ void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* Playe
 		EnhancedInputComponent->BindAction(DestroyBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::DestroyBlock);
 
 		EnhancedInputComponent->BindAction(FlyAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::Fly);
+
+		EnhancedInputComponent->BindAction(AscendAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Ascend);
+		EnhancedInputComponent->BindAction(DescendAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Descend);
 	}
 }
 
@@ -129,9 +132,6 @@ void AVoxelGenerationCharacter::SpawnBlock()
 
 		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(this, InteractedBlockPosition);
 		FIntVector WorldBlockPosition = FChunkData::GetWorldBlockPosition(this, SpawnBlockPosition);
-
-		UE_LOG(LogTemp, Warning, TEXT("InteractedWorldBlockPosition: %s"), *InteractedWorldBlockPosition.ToString());
-		UE_LOG(LogTemp, Warning, TEXT("WorldBlockPosition: %s"), *WorldBlockPosition.ToString());
 		
 		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
 		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(this, InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
@@ -150,6 +150,28 @@ void AVoxelGenerationCharacter::Fly()
 		else
 		{
 			MovementComponent->SetMovementMode(MOVE_Flying);
+		}
+	}
+}
+
+void AVoxelGenerationCharacter::Ascend()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			AddMovementInput(FVector::UpVector, VerticalMoveSpeed);
+		}
+	}
+}
+
+void AVoxelGenerationCharacter::Descend()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			AddMovementInput(FVector::DownVector, VerticalMoveSpeed);
 		}
 	}
 }
