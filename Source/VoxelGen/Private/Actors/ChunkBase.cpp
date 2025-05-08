@@ -193,40 +193,70 @@ void AChunkBase::SetColumns(const TArray<FChunkColumn>& NewColumns)
 
 EBlock AChunkBase::GetBlockAtPosition(const FIntVector& Position) const
 {
-	if (IsWithinChunkBounds(Position))
-	{
-		int32 ColumnIndex = FChunkData::GetColumnIndex(this, Position.X, Position.Y);
-		if (ColumnIndex < 0 || ColumnIndex >= ChunkColumns.Num())
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Invalid column index: %d"), ColumnIndex);
-			return EBlock::Air; // Invalid column index
-		}
-		return ChunkColumns[ColumnIndex].Blocks[Position.Z];
-	}
-	
-	FIntVector AdjBlockPosition;
-	if (AChunkBase* AdjChunk = GetAdjacentChunk(Position, &AdjBlockPosition))
-	{
-		return AdjChunk->GetBlockAtPosition(AdjBlockPosition);
-	}
-	
-	return EBlock::Air;
+	const int32 ChunkSize = FChunkData::GetChunkSize(this);
+    const int32 ChunkHeight = FChunkData::GetChunkHeight(this);
+    
+    if (Position.X >= 0 && Position.X < ChunkSize && 
+        Position.Y >= 0 && Position.Y < ChunkSize &&
+        Position.Z >= 0 && Position.Z < ChunkHeight)
+    {
+        const int32 ColumnIndex = Position.X + (Position.Y * ChunkSize);
+        
+        if (ColumnIndex >= 0 && ColumnIndex < ChunkColumns.Num())
+        {
+            return ChunkColumns[ColumnIndex].Blocks[Position.Z];
+        }
+        
+        UE_LOG(LogTemp, Warning, TEXT("Invalid column index: %d"), ColumnIndex);
+        return EBlock::Air;
+    }
+    
+    // Handle out-of-bounds positions with adjacent chunks
+    if (Position.Z >= 0 && Position.Z < ChunkHeight)
+    {
+        FIntVector2 AdjChunkPos = ChunkPosition;
+        FIntVector LocalPos = Position;
+        
+        // Calculate adjacent chunk coordinates without allocating a new object
+        if (Position.X < 0)
+        {
+            AdjChunkPos.X -= 1;
+            LocalPos.X += ChunkSize;
+        }
+        else if (Position.X >= ChunkSize)
+        {
+            AdjChunkPos.X += 1;
+            LocalPos.X -= ChunkSize;
+        }
+        
+        if (Position.Y < 0)
+        {
+            AdjChunkPos.Y -= 1;
+            LocalPos.Y += ChunkSize;
+        }
+        else if (Position.Y >= ChunkSize)
+        {
+            AdjChunkPos.Y += 1;
+            LocalPos.Y -= ChunkSize;
+        }
+        
+        // Lookup in adjacent chunk
+    	if (!ParentWorld) return EBlock::Air;
+        if (AChunkBase* AdjChunk = ParentWorld->GetChunksData().FindRef(AdjChunkPos))
+        {
+            const int32 AdjColumnIndex = LocalPos.X + (LocalPos.Y * ChunkSize);
+            if (AdjColumnIndex >= 0 && AdjColumnIndex < AdjChunk->ChunkColumns.Num())
+            {
+                return AdjChunk->ChunkColumns[AdjColumnIndex].Blocks[LocalPos.Z];
+            }
+        }
+    }
+    return EBlock::Air;
 }
 
 EBlock AChunkBase::GetBlockAtPosition(int X, int Y, int Z) const
 {
-	if (IsWithinChunkBounds(FIntVector(X, Y, Z)))
-	{
-		return ChunkColumns[FChunkData::GetColumnIndex(this, X, Y)].Blocks[Z];
-	}
-	
-	FIntVector AdjBlockPosition;
-	if (AChunkBase* AdjChunk = GetAdjacentChunk(FIntVector(X, Y, Z), &AdjBlockPosition))
-	{
-		return AdjChunk->GetBlockAtPosition(AdjBlockPosition);
-	}
-	
-	return EBlock::Air;
+	return GetBlockAtPosition(FIntVector(X, Y, Z));
 }
 
 AChunkBase* AChunkBase::GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition) const
@@ -242,9 +272,9 @@ AChunkBase* AChunkBase::GetAdjacentChunk(const FIntVector& Position, FIntVector*
 		*outAdjChunkBlockPosition = BlockPosition;
 	}
 	
-	if (ParentWorld->GetChunksData().Contains(AdjChunkPos))
+	if (AChunkBase* const* FoundChunkPtr = ParentWorld->GetChunksData().Find(AdjChunkPos))
 	{
-		return ParentWorld->GetChunksData().FindRef(AdjChunkPos);
+		return *FoundChunkPtr;
 	}
 	return nullptr;
 }

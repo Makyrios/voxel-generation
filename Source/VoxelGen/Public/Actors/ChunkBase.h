@@ -60,8 +60,8 @@ protected:
 	AChunkBase* GetAdjacentChunk(const FIntVector& Position, FIntVector* const outAdjChunkBlockPosition = nullptr) const;
 	bool AdjustForAdjacentChunk(const FIntVector& Position, FIntVector2& AdjChunkPosition, FIntVector& AdjBlockPosition) const;
 
-	bool IsWithinChunkBounds(const FIntVector& Position) const;
-	bool IsWithinVerticalBounds(const FIntVector& Position) const;
+	FORCEINLINE bool IsWithinChunkBounds(const FIntVector& Position) const;
+	FORCEINLINE bool IsWithinVerticalBounds(const FIntVector& Position) const;
 
 	// Update the adjacent chunk if the block is at the edge of the chunk
 	void UpdateAdjacentChunk(const FIntVector& LocalEdgeBlockPosition) const;
