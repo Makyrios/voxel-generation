@@ -139,30 +139,25 @@ void UTerrainGenerator::GenerateHeightMap()
 	{
 		for (int x = 0; x < WorldSizeInColumns; ++x)
 		{
-			// 1. Get base noise values from noise and splines
+			// Get base noise values from noise and splines
 			float Continentalness, Erosion, Weirdness, PeaksValleys;
 			CalculateTerrainParameters(x, y, Continentalness, Erosion, Weirdness, PeaksValleys);
-
+			
 			TerrainParamsMap.SetData(x,y, FTerrainParameterData(Continentalness, Erosion, Weirdness, PeaksValleys));
 
 			// Height Calculation (using splined [0,1] values, remapped to [-1,1] style for amplitude)
-            // The weights might need adjustment or a different combination formula
 			float ContRemapped = Remap01toNeg11(Continentalness);
-			float ErosionRemapped = Remap01toNeg11(Erosion);
 			float PVRemapped = Remap01toNeg11(PeaksValleys);
-            
-            // Example combination: C influences base, E flattens, PV adds features
-            // This is highly tunable. The provided theory doesn't specify how these combine for height.
-            // Original: float HeightNoise = (ContRemapped) - (ErosionRemapped) + (PVRemapped);
-            // Using weights:
-            float HeightNoise = (ContRemapped * ContinentalnessWeight) - 
-                                (ErosionRemapped * ErosionWeight) + 
-                                (PVRemapped * PeaksValleysWeight);
-            
-            // Normalize weighted sum if weights don't sum to 1, or ensure they do.
-            // For simplicity, let's assume weights are balanced or the amplitude handles scaling.
+			
+			float BaseNoise =
+			ContRemapped * ContinentalnessWeight +
+			PVRemapped   * PeaksValleysWeight;
 
-            float AbsoluteHeight = TerrainBaseHeight + HeightNoise * TerrainAmplitude;
+			float FlattenFactor = FMath::Clamp(1.0f - Erosion * ErosionWeight, 0.f, 1.f);
+
+			float HeightNoise = BaseNoise * FlattenFactor;
+			float AbsoluteHeight = TerrainBaseHeight + HeightNoise * TerrainAmplitude;
+			
             int FinalBlockHeight = FMath::Clamp(FMath::RoundToInt(AbsoluteHeight), 0, ChunkHeight - 1);
             HeightMap.SetData(x, y, FinalBlockHeight);
 		}

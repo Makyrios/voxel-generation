@@ -50,6 +50,10 @@ private:
 
 	void UnPauseGameIfChunksLoadingComplete() const;
 
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World")
+	int32 Seed = 1000;
+
 private:
 	UPROPERTY(EditAnywhere, Category = "Components")
 	TObjectPtr<UTerrainGenerator> TerrainGenerator;
@@ -60,7 +64,7 @@ private:
 	TQueue<AChunkBase*> ChunkClearQueue;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
-	float ClearChunkDelay = 0.02f;
+	float ClearChunkDelay = 0.002f;
 	
 	float CurrentClearChunkDelay = 0.f;
 	
