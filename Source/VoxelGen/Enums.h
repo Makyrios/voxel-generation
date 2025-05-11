@@ -20,10 +20,23 @@ enum class EBlock
 	Snow UMETA(DisplayName = "Snow"),
 	Sand UMETA(DisplayName = "Sand"),
 	Water UMETA(DisplayName = "Water"),
-	OakLeaves UMETA(DisplayName = "Oak Leaves"),
-	OakWood UMETA(DisplayName = "Oak Wood"),
 	Redstone UMETA(DisplayName = "Redstone"),
-	Redsand UMETA(DisplayName = "Red Sand")
+	Redsand UMETA(DisplayName = "Red Sand"),
+	OakLeaves UMETA(DisplayName = "Oak Leaves"),
+	OakLog UMETA(DisplayName = "Oak Log"),
+	BirchLeaves UMETA(DisplayName = "Birch Leaves"),
+	BirchLog UMETA(DisplayName = "Birch Log"),
+	CactusBlock UMETA(DisplayName = "Cactus Block"),
+	GrassFoliage UMETA(DisplayName = "Grass Foliage")
+};
+
+UENUM(BlueprintType)
+enum class EFoliageType : uint8
+{
+	OakTree UMETA(DisplayName = "Oak Tree"),
+	BirchTree UMETA(DisplayName = "Birch Tree"),
+	Cactus UMETA(DisplayName = "Cactus"),
+	GrassPlant UMETA(DisplayName = "Grass Plant") 
 };
 
 UENUM()

@@ -17,7 +17,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	EFastNoise_NoiseType NoiseType = EFastNoise_NoiseType::Perlin;
 	UPROPERTY(EditAnywhere)
-	int Seed = 1337;
+	int SeedOffset = 1337;
 	UPROPERTY(EditAnywhere)
 	float Frequency = 0.1f;
 	UPROPERTY(EditAnywhere)

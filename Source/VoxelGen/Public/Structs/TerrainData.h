@@ -7,21 +7,6 @@
 #include "VoxelGen/Enums.h"
 #include "TerrainData.generated.h"
 
-USTRUCT(BlueprintType)
-struct FBiomeWeight
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	EBiomeType Biome;
-
-	UPROPERTY()
-	float Weight;
-
-	FBiomeWeight() : Biome(EBiomeType::Grassland), Weight(0.0f) {}
-	FBiomeWeight(EBiomeType InBiome, float InWeight) : Biome(InBiome), Weight(InWeight) {}
-};
-
 USTRUCT()
 struct FTemperatureData
 {

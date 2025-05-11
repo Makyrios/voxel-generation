@@ -59,7 +59,7 @@ void AChunkWorld::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
 
     UpdateChunks();
-    ProcessChunksMeshGeneration(DeltaTime);
+    ProcessChunksMeshGeneration();
     ProcessChunksMeshClear(DeltaTime);
 }
 
@@ -216,6 +216,14 @@ AChunkBase* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates
                 Columns[FChunkData::GetColumnIndex(this, x, y)] = ColumnData;
             }
         }
+
+        // Decorate the column with foliage
+        FRandomStream FoliageRandomStream(Seed + ChunkCoordinates.X * 73856093 ^ ChunkCoordinates.Y * 19349663);
+        TerrainGenerator->DecorateChunkWithFoliage(
+        Columns, 
+        ChunkCoordinates,
+        FoliageRandomStream);
+        
         Chunk->SetColumns(Columns);
 
         ChunksData.Add(ChunkCoordinates, Chunk);
@@ -225,7 +233,7 @@ AChunkBase* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates
     return Chunk;
 }
 
-void AChunkWorld::ProcessChunksMeshGeneration(float DeltaTime)
+void AChunkWorld::ProcessChunksMeshGeneration()
 {
     // Iterate through VisibleChunks (which should be sorted by proximity)
     // to pick the next chunk to generate from the ChunksPendingGenerationMap.
@@ -258,7 +266,6 @@ void AChunkWorld::ProcessChunksMeshGeneration(float DeltaTime)
 
     // If there are still task slots and chunks in ChunksPendingGenerationMap
     // that were not in VisibleChunks, process them.
-    // This part ensures all enqueued chunks eventually get processed if slots are free.
     TArray<FIntVector2> KeysToRemove;
     for (auto It = ChunksPendingGenerationMap.CreateIterator(); It && RunningMeshTasks < MaxConcurrentMeshTasks; ++It)
     {

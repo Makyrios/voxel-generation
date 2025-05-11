@@ -196,8 +196,10 @@ void AChunkBase::SetColumns(const TArray<FChunkColumn>& NewColumns)
 
 EBlock AChunkBase::GetBlockAtPosition(const FIntVector& Position) const
 {
-	const int32 ChunkSize = FChunkData::GetChunkSize(this);
-    const int32 ChunkHeight = FChunkData::GetChunkHeight(this);
+	if (!GetWorld()) return EBlock::Air;
+	
+ 	const int32 ChunkSize = FChunkData::GetChunkSize(GetWorld());
+    const int32 ChunkHeight = FChunkData::GetChunkHeight(GetWorld());
     
     if (Position.X >= 0 && Position.X < ChunkSize && 
         Position.Y >= 0 && Position.Y < ChunkSize &&
@@ -423,6 +425,7 @@ FChunkMeshData& AChunkBase::GetMeshDataForBlock(EBlock BlockType)
 	case EBlock::Water:
 		return WaterChunkMeshData;
 	case EBlock::OakLeaves:
+	case EBlock::BirchLeaves:
 		return MaskedChunkMeshData;
 	default:
 		return OpaqueChunkMeshData;
@@ -436,6 +439,7 @@ int& AChunkBase::GetVertexCountForBlock(EBlock BlockType)
 	case EBlock::Water:
 		return WaterVertexCount;
 	case EBlock::OakLeaves:
+	case EBlock::BirchLeaves:
 		return MaskedVertexCount;
 	default:
 		return OpaqueVertexCount;

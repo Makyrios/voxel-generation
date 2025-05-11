@@ -2,19 +2,25 @@
 
 #include "Objects/TerrainGenerator.h"
 #include "FastNoiseWrapper.h"
+#include "Actors/ChunkWorld.h"
 #include "Structs/ChunkColumn.h"
 #include "Structs/ChunkData.h"
 #include "Engine/DataTable.h"
 #include "Math/UnrealMathUtility.h"
+#include "Structs/FoliageGenerator.h"
 
 UTerrainGenerator::UTerrainGenerator()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	FoliageGenerator = CreateDefaultSubobject<UFoliageGenerator>("FoliageGenerator");
 }
 
 void UTerrainGenerator::BeginPlay()
 {
 	Super::BeginPlay();
+
+	ParentWorld = Cast<AChunkWorld>(GetOwner());
 
 	if (!bIsInitialized)
 	{
@@ -57,7 +63,7 @@ void UTerrainGenerator::SetupNoise(TObjectPtr<UFastNoiseWrapper>& Noise, const U
 	}
 	Noise->SetupFastNoise(
 		Settings->NoiseType,
-		Settings->Seed,
+		ParentWorld->Seed + Settings->SeedOffset, // All seeds are offset by the world seed
 		Settings->Frequency,
 		Settings->Interpolation,
 		Settings->FractalType,
@@ -324,6 +330,43 @@ void UTerrainGenerator::PopulateColumnBlocks(FChunkColumn& ColumnData)
 	}
 }
 
+void UTerrainGenerator::DecorateChunkWithFoliage(TArray<FChunkColumn>& InOutChunkColumns,
+	const FIntVector2& ChunkGridPosition, const FRandomStream& WorldFoliageStreamBase) const
+{
+	if (!bIsInitialized || InOutChunkColumns.IsEmpty() || !FoliageGenerator) return;
+	int ChunkSize = FChunkData::GetChunkSize(this);
+	
+    for (int Y_Local = 0; Y_Local < ChunkSize; ++Y_Local)
+    {
+        for (int X_Local = 0; X_Local < ChunkSize; ++X_Local)
+        {
+            int ColumnIndex = FChunkData::GetColumnIndex(this, X_Local, Y_Local);
+            FChunkColumn& CurrentColumn = InOutChunkColumns[ColumnIndex];
+            EBiomeType BiomeType = CurrentColumn.GetBiomeType();
+            FBiomeSettings* BiomeInfo = GetBiomeSettings(BiomeType);
+
+            if (!BiomeInfo) continue;
+        	
+            FRandomStream ColumnFoliageDecisionStream;
+            int32 GlobalX = ChunkGridPosition.X * ChunkSize + X_Local;
+            int32 GlobalY = ChunkGridPosition.Y * ChunkSize + Y_Local;
+        	
+            ColumnFoliageDecisionStream.Initialize(
+                WorldFoliageStreamBase.GetCurrentSeed() ^ GlobalX ^ (GlobalY << 16) ^ (GlobalY >> 16)
+            );
+
+            FoliageGenerator->AttemptPlaceFoliageAt(
+                InOutChunkColumns,
+                X_Local, Y_Local,
+                BiomeInfo,
+                ColumnFoliageDecisionStream,
+                ChunkSize,
+                FChunkData::GetChunkHeight(this)
+            );
+        }
+    }
+}
+
 EBiomeType UTerrainGenerator::DetermineBiomeType(const FCategorizedBiomeInputs& Params) const
 {
 	// Stage 1: Non-Inland Biomes (Oceans, Mushroom Fields)
@@ -340,34 +383,28 @@ EBiomeType UTerrainGenerator::DetermineBiomeType(const FCategorizedBiomeInputs& 
             case ETemperatureType::Coldest: // Frozen Ocean
                 return EBiomeType::Ice;
             case ETemperatureType::Cold:    // Cold Ocean
-                return EBiomeType::Tundra; // Or Ice if you want more frozen water
+                return EBiomeType::Tundra;
             // Lukewarm, Warm, Regular Ocean
             case ETemperatureType::Temperate:
             case ETemperatureType::Warm:
             case ETemperatureType::Hot:
-                 // Rely on WaterThreshold to make these watery.
-                 // Grassland is a neutral placeholder. Desert if you want barren ocean floor.
                 return EBiomeType::Grassland; 
             default: return EBiomeType::Grassland;
         }
     }
 
     // Stage 2: Inland Biomes (Coast, Near-Inland, Mid-Inland, Far-Inland)
-    // This is where the big table from the theory comes in.
-    // This is a VASTLY simplified version. A full implementation would be hundreds of lines.
 
     // Simplified: River-like biomes (Valleys PV)
     if (Params.PV == EPVType::Valleys) {
-        if (Params.Temperature == ETemperatureType::Coldest) return EBiomeType::Ice; // Frozen River
-        // For other rivers, could be Grassland and carved lower, or rely on WaterThreshold
-        // If E6 (high erosion, flat), it could be swampy
+        if (Params.Temperature == ETemperatureType::Coldest) return EBiomeType::Ice;
         if (Params.Erosion == EErosionType::Level6) {
             if (Params.Temperature == ETemperatureType::Cold || Params.Temperature == ETemperatureType::Temperate)
-                return EBiomeType::SeasonalForest; // Swamp -> SeasonalForest or TemperateRainforest
+                return EBiomeType::SeasonalForest;
             if (Params.Temperature == ETemperatureType::Warm || Params.Temperature == ETemperatureType::Hot)
-                return EBiomeType::TropicalRainforest; // Mangrove Swamp -> TropicalRainforest
+                return EBiomeType::TropicalRainforest;
         }
-        return EBiomeType::Grassland; // Generic River
+        return EBiomeType::Grassland;
     }
 
     // Simplified: Peak-like biomes
@@ -384,23 +421,6 @@ EBiomeType UTerrainGenerator::DetermineBiomeType(const FCategorizedBiomeInputs& 
     if (Params.Continentalness == EContinentalnessType::Coast && Params.PV == EPVType::Low) {
          return MapBeachBiome(Params.Temperature);
     }
-
-
-    // Catch-all for "Middle Biomes" / "Plateau Biomes" etc. using a simpler Whittaker-style lookup
-    // This replaces your original BiomeLookupTable with a code version,
-    // but now it's after more complex rules have been (partially) applied.
-    // This is where you'd put the detailed "Middle Biomes", "Plateau Biomes" logic if expanding.
-    // For now, using the provided mapping functions which are simplified.
-    // Example: Check for conditions that would lead to Badlands
-    bool IsBadlandsCondition = (Params.Temperature == ETemperatureType::Hot &&
-                               (Params.Continentalness == EContinentalnessType::MidInland || Params.Continentalness == EContinentalnessType::FarInland) &&
-                               (Params.PV == EPVType::Valleys || Params.PV == EPVType::Low || (Params.PV == EPVType::Mid && Params.Erosion <= EErosionType::Level2))
-                               ) ||
-                               (Params.PV == EPVType::High && Params.Erosion == EErosionType::Level0 && Params.Temperature == ETemperatureType::Hot) ||
-                               (Params.PV == EPVType::Peaks && Params.Erosion == EErosionType::Level0 && Params.Temperature == ETemperatureType::Hot);
-
-    if(IsBadlandsCondition) return MapBadlandsBiome(Params.Humidity, Params.WeirdnessValue);
-
 
     // Default to a "Middle Biome" style mapping if nothing else fits
     return MapMiddleBiome(Params.Temperature, Params.Humidity, Params.WeirdnessValue);
@@ -457,13 +477,9 @@ EPVType UTerrainGenerator::CategorizePV(float PVValue_neg1_1) const
 
 EBiomeType UTerrainGenerator::MapMiddleBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness_neg1_1) const
 {
-    // This is a direct translation of the "Middle Biomes" table, simplified to your EBiomeType
-    // T=0 (Coldest), T=1 (Cold), T=2 (Temperate), T=3 (Warm), T=4 (Hot)
-    // H=0 (Dryest), H=1 (Dry), H=2 (Medium), H=3 (Wet), H=4 (Wettest)
-
     switch (Temp)
     {
-    case ETemperatureType::Coldest: // T=0
+    case ETemperatureType::Coldest:
         switch (Hum)
         {
         case EHumidityType::Dryest: // Snowy Plains / Ice Spikes
@@ -525,61 +541,34 @@ EBiomeType UTerrainGenerator::MapMiddleBiome(ETemperatureType Temp, EHumidityTyp
     }
 }
 
-EBiomeType UTerrainGenerator::MapPlateauBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness_neg1_1) const {
-    // Similar to MiddleBiomes, but some specific changes (e.g., Meadow, Savanna Plateau)
-    // This is a simplified stub. For full detail, expand like MapMiddleBiome.
-    // For now, it can often default to middle biome logic or specific overrides.
+EBiomeType UTerrainGenerator::MapPlateauBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness_neg1_1) const
+{
     if (Temp == ETemperatureType::Warm && (Hum == EHumidityType::Dryest || Hum == EHumidityType::Dry)) {
-        return EBiomeType::Savanna; // Savanna Plateau
-    }
-    if (Temp == ETemperatureType::Hot) { // Badlands variants on plateaus
-        return MapBadlandsBiome(Hum, Weirdness_neg1_1);
+        return EBiomeType::Savanna;
     }
     // Fallback to middle biome logic for other cases for simplicity here
     return MapMiddleBiome(Temp, Hum, Weirdness_neg1_1);
 }
 
-EBiomeType UTerrainGenerator::MapBeachBiome(ETemperatureType Temp) const {
-    // T=0 Snowy Beach
-    // T=1,2,3 Beach
-    // T=4 Desert (as beach)
+EBiomeType UTerrainGenerator::MapBeachBiome(ETemperatureType Temp) const
+{
     switch (Temp) {
-        case ETemperatureType::Coldest: return EBiomeType::Tundra; // Snowy Beach
+        case ETemperatureType::Coldest: return EBiomeType::Tundra;
         case ETemperatureType::Cold:
         case ETemperatureType::Temperate:
-        case ETemperatureType::Warm: return EBiomeType::Grassland; // Beach (sand, use Grassland as placeholder)
-        case ETemperatureType::Hot: return EBiomeType::Desert;   // Desert Beach
+        case ETemperatureType::Warm: return EBiomeType::Grassland;
+        case ETemperatureType::Hot: return EBiomeType::Desert;
         default: return EBiomeType::Grassland;
     }
 }
 
-EBiomeType UTerrainGenerator::MapBadlandsBiome(EHumidityType Hum, float Weirdness_neg1_1) const {
-    // H=0,1 Badlands (W<0) / Eroded Badlands (W>0)
-    // H=2 Badlands
-    // H=3,4 Wooded Badlands
-    switch (Hum) {
-        case EHumidityType::Dryest:
-        case EHumidityType::Dry:
-        case EHumidityType::Medium:
-            return EBiomeType::Desert; // Badlands / Eroded Badlands
-        case EHumidityType::Wet:
-        case EHumidityType::Wettest:
-            return EBiomeType::Savanna; // Wooded Badlands -> Savanna as it's dry but with some wood
-        default: return EBiomeType::Desert;
-    }
-}
-
 EBiomeType UTerrainGenerator::MapShatteredBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness_neg1_1) const {
-    // Highly varied, often windswept versions of other biomes.
-    // Simplified: just map to a more rugged/exposed version or similar to MiddleBiome.
     if (Temp <= ETemperatureType::Cold && Hum <= EHumidityType::Dry)
-        return EBiomeType::Tundra; // Windswept Gravelly Hills -> Tundra
+        return EBiomeType::Tundra;
 
-    // Fallback for simplicity
     return MapMiddleBiome(Temp, Hum, Weirdness_neg1_1);
 }
 
-// --- Data Accessors ---
 float UTerrainGenerator::GetHeightData(int GlobalX, int GlobalY) const
 {
 	if (!bIsInitialized) return 0.0f;
@@ -598,7 +587,6 @@ float UTerrainGenerator::GetHumidityData(int GlobalX, int GlobalY) const
 	return HumidityMap.GetData(GlobalX, GlobalY);
 }
 
-// --- Helper Functions ---
 
 FBiomeSettings* UTerrainGenerator::GetBiomeSettings(EBiomeType BiomeType) const
 {

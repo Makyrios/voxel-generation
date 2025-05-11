@@ -10,6 +10,8 @@
 #include "VoxelGen/Enums.h"
 #include "TerrainGenerator.generated.h"
 
+class AChunkWorld;
+class UFoliageGenerator;
 struct FChunkColumn;
 class UFastNoiseWrapper;
 
@@ -23,6 +25,13 @@ public:
 
 	FChunkColumn GenerateColumnData(int GlobalX, int GlobalY);
 	void PopulateColumnBlocks(FChunkColumn& ColumnData);
+	
+	// Foliage
+	void DecorateChunkWithFoliage(
+		TArray<FChunkColumn>& InOutChunkColumns,
+		const FIntVector2& ChunkGridPosition,
+		const FRandomStream& WorldFoliageStreamBase
+	) const;
 
 	float GetHeightData(int GlobalX, int GlobalY) const;
 	float GetTemperatureData(int GlobalX, int GlobalY) const;
@@ -61,7 +70,6 @@ private:
 	EBiomeType MapMiddleBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness) const;
 	EBiomeType MapPlateauBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness) const;
 	EBiomeType MapBeachBiome(ETemperatureType Temp) const;
-	EBiomeType MapBadlandsBiome(EHumidityType Hum, float Weirdness) const;
 	EBiomeType MapShatteredBiome(ETemperatureType Temp, EHumidityType Hum, float Weirdness) const;
 
 	FBiomeSettings* GetBiomeSettings(EBiomeType BiomeType) const;
@@ -124,6 +132,12 @@ public:
 	float PeaksValleysWeight = 0.3f;
 	
 private:
+	UPROPERTY()
+	TObjectPtr<UFoliageGenerator> FoliageGenerator;
+
+	UPROPERTY()
+	TObjectPtr<AChunkWorld> ParentWorld;
+	
 	// Noise instances
 	UPROPERTY() TObjectPtr<UFastNoiseWrapper> ContinentalnessNoise;
 	UPROPERTY() TObjectPtr<UFastNoiseWrapper> ErosionNoise;
@@ -152,15 +166,4 @@ private:
 	// Internal State
 	int WorldSizeInColumns = 0;
 	bool bIsInitialized = false;
-
-	// Biome lookup table (Whittaker diagram inspired)
-	const TArray<TArray<EBiomeType>> BiomeLookupTable = {
-		// Coldest    Colder      Cold        Warm         Warmer       Warmest
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::Grassland, EBiomeType::Desert, EBiomeType::Desert, EBiomeType::Desert },         // Dryest
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::Grassland, EBiomeType::Desert, EBiomeType::Desert, EBiomeType::Desert },         // Dryer
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::Woodland, EBiomeType::Woodland, EBiomeType::Savanna, EBiomeType::Savanna },      // Dry
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::BorealForest, EBiomeType::Woodland, EBiomeType::Savanna, EBiomeType::Savanna },  // Wet
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::BorealForest, EBiomeType::SeasonalForest, EBiomeType::TropicalRainforest, EBiomeType::TropicalRainforest }, // Wetter
-		{ EBiomeType::Ice, EBiomeType::Tundra, EBiomeType::BorealForest, EBiomeType::TemperateRainforest, EBiomeType::TropicalRainforest, EBiomeType::TropicalRainforest } // Wettest
-	};
 };

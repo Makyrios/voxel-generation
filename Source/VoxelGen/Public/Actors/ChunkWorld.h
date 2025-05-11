@@ -31,7 +31,7 @@ protected:
 
 private:
 	void UpdateChunks();
-	void ProcessChunksMeshGeneration(float DeltaTime);
+	void ProcessChunksMeshGeneration();
 	void ProcessChunksMeshClear(float DeltaTime);
 
 	bool IsPlayerChunkUpdated();
