@@ -18,7 +18,6 @@ void FChunkMeshLoaderAsync::DoWork()
 		if (Chunk->IsValidLowLevel() && !Chunk->IsPendingKillPending() && Chunk->GetWorld())
 		{
 			Chunk->RegenerateMesh();
-			
 		}
 	}
 }
