@@ -43,4 +43,5 @@ private:
 		int LocalX, int LocalY, int LocalZ,
 		EBlock BlockType,
 		int ChunkSize, int ChunkHeight) const;
+	
 };

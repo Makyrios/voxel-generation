@@ -81,11 +81,13 @@ public:
 	
 	FChunkMeshData OpaqueChunkMeshData;
 	FChunkMeshData WaterChunkMeshData;
-	FChunkMeshData MaskedChunkMeshData;
+	FChunkMeshData LeavesChunkMeshData;
+	FChunkMeshData GrassChunkMeshData;
 	
 	int OpaqueVertexCount = 0;
 	int WaterVertexCount = 0;
-	int MaskedVertexCount = 0;
+	int LeavesVertexCount = 0;
+	int GrassVertexCount = 0;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chunk|Data")
@@ -105,7 +107,10 @@ protected:
 	TObjectPtr<UMaterialInterface> WaterMaterial;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk|Materials")
-	TObjectPtr<UMaterialInterface> MaskedMaterial;
+	TObjectPtr<UMaterialInterface> LeavesMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk|Materials")
+	TObjectPtr<UMaterialInterface> GrassMaterial;
 
 	UPROPERTY()
 	AChunkWorld* ParentWorld;

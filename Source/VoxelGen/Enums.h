@@ -43,8 +43,9 @@ UENUM()
 enum class EBlockMaterialType
 {
 	Opaque UMETA(DisplayName = "Opaque"),
-	Transparent UMETA(DisplayName = "Transparent"),
-	Masked UMETA(DisplayName = "Masked")
+	Water UMETA(DisplayName = "Water"),
+	Leaves UMETA(DisplayName = "Leaves"),
+	Grass UMETA(DisplayName = "Grass")
 };
 
 UENUM(BlueprintType)

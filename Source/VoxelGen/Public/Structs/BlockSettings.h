@@ -22,6 +22,14 @@ struct VOXELGEN_API FBlockTextureData
 
 };
 
+UENUM(BlueprintType)
+enum class EBlockRenderMode : uint8
+{
+	Cube UMETA(DisplayName = "Cube"),
+	CrossPlanes UMETA(DisplayName = "Cross Planes"),
+	CustomMesh UMETA(DisplayName = "Custom Mesh")
+};
+
 USTRUCT(BlueprintType)
 struct VOXELGEN_API FBlockSettings : public FTableRowBase
 {
@@ -34,6 +42,9 @@ struct VOXELGEN_API FBlockSettings : public FTableRowBase
 	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
+	EBlockRenderMode RenderMode = EBlockRenderMode::Cube;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
 	EBlockMaterialType MaterialType = EBlockMaterialType::Opaque;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
@@ -42,11 +53,22 @@ struct VOXELGEN_API FBlockSettings : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
 	bool bIsTransparent = false; // For visibility culling (e.g., water is transparent, leaves are not fully)
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
+	float RenderScale = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties")
+	float RenderHeight = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Properties", meta = (EditCondition = "RenderMode == EBlockRenderMode::CrossPlanes"))
+	bool RandomRotation = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Texture")
+	int NumTextureVariants = 1;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block Texture")
 	FBlockTextureData TextureData;
 	
 	// USoundCue* BreakSound;
 	// bool bEmitsLight;
-
+	
 	FBlockSettings() : BlockID(EBlock::Air) {}
 };

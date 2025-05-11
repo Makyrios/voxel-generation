@@ -7,7 +7,7 @@
 #include "Structs/ChunkData.h"
 #include "Engine/DataTable.h"
 #include "Math/UnrealMathUtility.h"
-#include "Structs/FoliageGenerator.h"
+#include "Objects/FoliageGenerator.h"
 
 UTerrainGenerator::UTerrainGenerator()
 {

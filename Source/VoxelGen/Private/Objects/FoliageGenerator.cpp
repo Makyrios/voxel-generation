@@ -1,8 +1,9 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Structs/FoliageGenerator.h"
+#include "Objects/FoliageGenerator.h"
 
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Structs/BiomeSettings.h"
 #include "Structs/ChunkColumn.h"
 
@@ -155,8 +156,6 @@ void UFoliageGenerator::GenerateOakTree(TArray<FChunkColumn>& ChunkColumnsData, 
             }
         }
     }
-    // Ensure top of trunk is covered
-    SetBlockInChunkColumns(ChunkColumnsData, TrunkX, TrunkY, BaseZ + FoliageHeight, EBlock::OakLeaves, ChunkSize, ChunkHeight);
 }
 
 void UFoliageGenerator::GenerateBirchTree(TArray<FChunkColumn>& ChunkColumnsData, const FIntVector& TreeBaseLocalPosInChunk,
@@ -215,8 +214,6 @@ void UFoliageGenerator::GenerateBirchTree(TArray<FChunkColumn>& ChunkColumnsData
             }
         }
     }
-    // Ensure top of trunk is covered
-    SetBlockInChunkColumns(ChunkColumnsData, TrunkX, TrunkY, CanopyBaseZ + CanopyVRadius + 1, EBlock::BirchLeaves, ChunkSize, ChunkHeight);
 }
 
 void UFoliageGenerator::GenerateCactus(TArray<FChunkColumn>& ChunkColumnsData, const FIntVector& CactusBaseLocalPosInChunk,

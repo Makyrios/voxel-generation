@@ -67,7 +67,7 @@ void AChunkBase::ApplyMesh()
 		Mesh->SetMaterial(0, OpaqueMaterial);
 	}
 
-	// Create section for Translucent blocks (Material Slot 1)
+	// Create section for Water blocks (Material Slot 1)
 	if (WaterChunkMeshData.Vertices.Num() > 0 && WaterMaterial)
 	{
 		Mesh->CreateMeshSection(1, WaterChunkMeshData.Vertices, WaterChunkMeshData.Triangles,
@@ -76,13 +76,22 @@ void AChunkBase::ApplyMesh()
 		Mesh->SetMaterial(1, WaterMaterial);
 	}
 
-	// Create section for Masked blocks (Material Slot 2)
-	if (MaskedChunkMeshData.Vertices.Num() > 0 && MaskedMaterial)
+	// Create section for Leaves (masked) (Material Slot 2)
+	if (LeavesChunkMeshData.Vertices.Num() > 0 && LeavesMaterial)
 	{
-		Mesh->CreateMeshSection(2, MaskedChunkMeshData.Vertices, MaskedChunkMeshData.Triangles,
-								TArray<FVector>(), MaskedChunkMeshData.UV, MaskedChunkMeshData.Colors,
+		Mesh->CreateMeshSection(2, LeavesChunkMeshData.Vertices, LeavesChunkMeshData.Triangles,
+								TArray<FVector>(), LeavesChunkMeshData.UV, LeavesChunkMeshData.Colors,
 								TArray<FProcMeshTangent>(), true);
-		Mesh->SetMaterial(2, MaskedMaterial);
+		Mesh->SetMaterial(2, LeavesMaterial);
+	}
+
+	// Create section for Grass (masked) (Material Slot 3)
+	if (GrassChunkMeshData.Vertices.Num() > 0 && GrassMaterial)
+	{
+		Mesh->CreateMeshSection(3, GrassChunkMeshData.Vertices, GrassChunkMeshData.Triangles,
+								TArray<FVector>(), GrassChunkMeshData.UV, GrassChunkMeshData.Colors,
+								TArray<FProcMeshTangent>(), false);
+		Mesh->SetMaterial(3, GrassMaterial);
 	}
 
 	bCanChangeBlocks = true;
@@ -162,11 +171,13 @@ void AChunkBase::RegenerateMesh()
 	// Clear all mesh data stores
 	OpaqueChunkMeshData.Clear();
 	WaterChunkMeshData.Clear();
-	MaskedChunkMeshData.Clear();
+	LeavesChunkMeshData.Clear();
+	GrassChunkMeshData.Clear();
 
 	OpaqueVertexCount = 0;
 	WaterVertexCount = 0;
-	MaskedVertexCount = 0;
+	LeavesVertexCount = 0;
+	GrassVertexCount = 0;
 
 	GenerateMesh();
 	AsyncTask(ENamedThreads::GameThread, [&]()
@@ -420,28 +431,42 @@ void AChunkBase::DestroyBlock(const FIntVector& LocalChunkBlockPosition)
 
 FChunkMeshData& AChunkBase::GetMeshDataForBlock(EBlock BlockType)
 {
-	switch (BlockType)
+	if (const FBlockSettings* Settings = GetBlockData(BlockType))
 	{
-	case EBlock::Water:
-		return WaterChunkMeshData;
-	case EBlock::OakLeaves:
-	case EBlock::BirchLeaves:
-		return MaskedChunkMeshData;
-	default:
-		return OpaqueChunkMeshData;
+		switch (Settings->MaterialType)
+		{
+		case EBlockMaterialType::Water:
+			return WaterChunkMeshData;
+		case EBlockMaterialType::Leaves:
+			return LeavesChunkMeshData;
+		case EBlockMaterialType::Opaque:
+			return OpaqueChunkMeshData;
+		case EBlockMaterialType::Grass:
+			return GrassChunkMeshData;
+		default:
+			return OpaqueChunkMeshData;
+		}
 	}
+	return OpaqueChunkMeshData;
 }
 
 int& AChunkBase::GetVertexCountForBlock(EBlock BlockType)
 {
-	switch (BlockType)
+	if (const FBlockSettings* Settings = GetBlockData(BlockType))
 	{
-	case EBlock::Water:
-		return WaterVertexCount;
-	case EBlock::OakLeaves:
-	case EBlock::BirchLeaves:
-		return MaskedVertexCount;
-	default:
-		return OpaqueVertexCount;
+		switch (Settings->MaterialType)
+		{
+		case EBlockMaterialType::Water:
+			return WaterVertexCount;
+		case EBlockMaterialType::Leaves:
+			return LeavesVertexCount;
+		case EBlockMaterialType::Opaque:
+			return OpaqueVertexCount;
+		case EBlockMaterialType::Grass:
+			return GrassVertexCount;
+		default:
+			return OpaqueVertexCount;
+		}
 	}
+	return OpaqueVertexCount;
 }
