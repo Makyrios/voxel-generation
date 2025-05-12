@@ -29,6 +29,7 @@ public:
 	void RegenerateMeshAsync();
 	void ClearMesh();
 
+	TArray<FChunkColumn> GetColumns() const { return ChunkColumns; }
 	void SetColumns(const TArray<FChunkColumn>& NewColumns);
 
 	void SpawnBlock(const FIntVector& LocalChunkBlockPosition, EBlock BlockType);

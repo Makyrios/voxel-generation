@@ -65,6 +65,7 @@ void AGreedyChunk::GenerateMesh()
                 // Traverse along Axis1 (e.g., X) - Width of the slice
                 for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < InnerAxisSize1; ++ChunkItr[Axis1])
                 {
+                    if (!GetWorld() || !this) return;
                     const EBlock CurrentBlockType = GetBlockAtPosition(ChunkItr);
                     FBlockSettings CurrentSettings = GetBlockData(CurrentBlockType);
 

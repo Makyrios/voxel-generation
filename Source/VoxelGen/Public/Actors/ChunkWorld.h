@@ -1,11 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ChunkWorld.generated.h"
 
+struct FChunkColumn;
 struct FBiomeWeight;
 class AChunkBase;
 class AVoxelGenerationCharacter;
@@ -14,75 +13,83 @@ class UTerrainGenerator;
 UCLASS()
 class VOXELGEN_API AChunkWorld : public AActor
 {
-	GENERATED_BODY()
-
-public:    
-	AChunkWorld();
-	void InitializeWorld();
-
-	const TMap<FIntVector2, AChunkBase*>& GetChunksData() const { return ChunksData; }
-
-	void NotifyMeshTaskCompleted() { --RunningMeshTasks; }
-
-protected:
-	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void Tick(float DeltaTime) override;
-
-private:
-	void UpdateChunks();
-	void ProcessChunksMeshGeneration();
-	void ProcessChunksMeshClear(float DeltaTime);
-
-	bool IsPlayerChunkUpdated();
-	AChunkBase* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
-
-	void GenerateChunksData();
-	
-	void ActivateVisibleChunks(const FIntVector2& ChunkCoordinates);
-	bool IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int x, int y);
-	void DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVisibleChunks);
-
-	void EnqueueChunkForGeneration(AChunkBase* Chunk);
-	void EnqueueChunkForClearing(AChunkBase* Chunk);
-	
-	void SortVisibleChunksByDistance();
-
-	void UnPauseGameIfChunksLoadingComplete() const;
+    GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World")
-	int32 Seed = 1000;
+    AChunkWorld();
+
+    const TMap<FIntVector2, TObjectPtr<AChunkBase>>& GetChunksData() const { return ChunksData; }
+    void NotifyMeshTaskCompleted() { --RunningMeshTasks; }
+
+    UFUNCTION(BlueprintCallable)
+    void RegenerateWorld();
+
+
+protected:
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void Tick(float DeltaTime) override;
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Components")
-	TObjectPtr<UTerrainGenerator> TerrainGenerator;
-	
-	TMap<FIntVector2, AChunkBase*> ChunksData;
-	TMap<FIntVector2, AChunkBase*> ChunksPendingGenerationMap;
-	
-	TQueue<AChunkBase*> ChunkClearQueue;
+    // Initialization
+    void InitializeWorld();
 
-	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
-	float ClearChunkDelay = 0.002f;
-	
-	float CurrentClearChunkDelay = 0.f;
-	
-	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World", meta = (ClampMin = "1"))
-	int32 MaxConcurrentMeshTasks = FPlatformMisc::NumberOfCores();
-	std::atomic<int32> RunningMeshTasks = 0;
+    // Update Logic
+    void UpdateChunksForGeneration();
+    void UpdateChunksData(); 
+    void ProcessChunksMeshGeneration();
 
-	FIntVector2 CurrentPlayerChunk;
-	TArray<FIntVector2> VisibleChunks;
+    // Chunk Management
+    bool IsPlayerChunkUpdated();
+    AChunkBase* TryRestoreSavedChunk(const FIntVector2& ChunkCoordinates);
+    AChunkBase* GetExistingChunk(const FIntVector2& ChunkCoordinates) const;
+    AChunkBase* CreateAndInitializeChunk(const FIntVector2& ChunkCoordinates);
+    AChunkBase* SpawnChunkActorAt(const FIntVector2& ChunkCoordinates);
+    AChunkBase* LoadChunkAtPosition(const FIntVector2& ChunkCoordinates);
+    void DestroyChunkActor(const FIntVector2& ChunkCoordinates);
 
-	UPROPERTY()
-	AVoxelGenerationCharacter* PlayerCharacter = nullptr;
+    // Helper Functions
+    void SortVisibleChunksByDistance();
+    void UnPauseGameIfChunksLoadingComplete() const;
+    bool IsWithinLoadDistance(const FIntVector2& ChunkCoordinates) const;
+    bool IsWithinDrawDistance(const FIntVector2& ChunkCoordinates) const;
 
-	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
-	TSubclassOf<AChunkBase> ChunkClass;
+public:
+    UPROPERTY(EditAnywhere, Category = "Settings|Chunk World", meta = (ClampMin = "0", UIMin = "0"))
+    int32 DrawDistance = 5;
+    int32 LoadDistance = 6;
 
-	UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
-	int DrawDistance = 5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World")
+    int32 Seed = 1000;
+    
+private:
+    // Performance and Utility
+    UPROPERTY(EditAnywhere, Category = "Performance", meta = (ClampMin = "1", UIMin = "1"))
+    int32 MaxConcurrentMeshTasks = FPlatformMisc::NumberOfCores();
 
-	float ChunkSizeSquared;
+    // Components
+    UPROPERTY(EditAnywhere, Category = "Components")
+    TObjectPtr<UTerrainGenerator> TerrainGenerator;
+
+    UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
+    TSubclassOf<AChunkBase> ChunkClass;
+
+    // Runtime Data
+    TMap<FIntVector2, TObjectPtr<AChunkBase>> ChunksData;
+    TMap<FIntVector2, TArray<FChunkColumn>> SavedChunkColumns;
+    TMap<FIntVector2, TObjectPtr<AChunkBase>> ChunksPendingGenerationMap;
+
+    TArray<FIntVector2> VisibleChunks;
+    FIntVector2 CurrentPlayerChunk;
+
+    UPROPERTY()
+    TObjectPtr<AVoxelGenerationCharacter> PlayerCharacter = nullptr;
+
+    // Cached Values
+    int32 ChunkSize = 0;
+    float ScaledBlockSize = 0.f;
+
+    // State Tracking
+    bool bWorldInitialized = false;
+    std::atomic<int32> RunningMeshTasks = 0;
 };

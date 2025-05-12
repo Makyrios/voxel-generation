@@ -1,15 +1,23 @@
 #include "Actors/ChunkWorld.h"
 
-#include "Actors/GreedyChunk.h"
+#include "Actors/ChunkBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Objects/TerrainGenerator.h"
 #include "Structs/ChunkData.h"
 #include "Player/Character/VoxelGenerationCharacter.h"
+#include "HAL/PlatformMisc.h"
+#include "Async/Async.h"
+#include "Logging/LogMacros.h"
+
+
+float DistSquared(const FIntVector2& A, const FIntVector2& B)
+{
+    return FMath::Square(A.X - B.X) + FMath::Square(A.Y - B.Y);
+}
 
 AChunkWorld::AChunkWorld()
 {
     PrimaryActorTick.bCanEverTick = true;
-
     TerrainGenerator = CreateDefaultSubobject<UTerrainGenerator>("TerrainGenerator");
 }
 
@@ -17,105 +25,100 @@ void AChunkWorld::BeginPlay()
 {
     Super::BeginPlay();
 
-    ChunkSizeSquared = FChunkData::GetChunkSize(this) * FChunkData::GetChunkSize(this);
-    
+    LoadDistance = DrawDistance + 1;
+
+    ChunkSize = FChunkData::GetChunkSize(this);
+    ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
+
     InitializeWorld();
+
+    bWorldInitialized = true;
 }
 
 void AChunkWorld::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     Super::EndPlay(EndPlayReason);
-    
+
+    TArray<FIntVector2> Keys;
+    ChunksData.GetKeys(Keys);
+    for (const FIntVector2& Key : Keys)
+    {
+        DestroyChunkActor(Key);
+    }
+
+    ChunksData.Empty();
     ChunksPendingGenerationMap.Empty();
-    ChunkClearQueue.Empty();
+    VisibleChunks.Empty();
+
+    RunningMeshTasks = 0;
 }
 
 void AChunkWorld::InitializeWorld()
 {
     PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+    if (!PlayerCharacter) return;
+
+    if (!TerrainGenerator) {
+        return;
+    }
+    
+    if (!TerrainGenerator->IsNoiseInitialized())
+    {
+        FTimerHandle WaitTimer;
+        GetWorldTimerManager().SetTimer(WaitTimer, this, &AChunkWorld::InitializeWorld, 0.1f, false);
+        return;
+    }
 
     SetTickableWhenPaused(true);
     UGameplayStatics::SetGamePaused(GetWorld(), true);
-
-    CurrentClearChunkDelay = ClearChunkDelay;
-    
-    GenerateChunksData();
-    
-    // Force update if player position hasn't changed yet but world just loaded
-    if (IsPlayerChunkUpdated() || !PlayerCharacter)
-    {
-        UpdateChunks();
-    }
-    // If player position is already set, ensure CurrentPlayerChunk is used
-    else
-    {
-        ActivateVisibleChunks(CurrentPlayerChunk);
-        SortVisibleChunksByDistance();
-    }
 }
 
 void AChunkWorld::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-
-    UpdateChunks();
+    
+    if (IsPlayerChunkUpdated())
+    {
+        UpdateChunksData();
+        UpdateChunksForGeneration();
+        SortVisibleChunksByDistance();
+    }
     ProcessChunksMeshGeneration();
-    ProcessChunksMeshClear(DeltaTime);
 }
 
-void AChunkWorld::GenerateChunksData()
+void AChunkWorld::RegenerateWorld()
 {
-    for (int x = 0; x < FChunkData::GetWorldSize(this); ++x)
-    {
-        for (int y = 0; y < FChunkData::GetWorldSize(this); ++y)
-        {
-            LoadChunkAtPosition(FIntVector2(x, y));
-        }
-    }
-}
-
-void AChunkWorld::UpdateChunks()
-{
-    if (!IsPlayerChunkUpdated() && !UGameplayStatics::IsGamePaused(GetWorld())) return;
-
-    TArray<FIntVector2> PreviousVisibleChunks = VisibleChunks;
-    VisibleChunks.Empty();
-
-    ActivateVisibleChunks(CurrentPlayerChunk);
+    UpdateChunksData();
+    UpdateChunksForGeneration();
     SortVisibleChunksByDistance();
-    DeactivatePreviousChunks(PreviousVisibleChunks);
+    ProcessChunksMeshGeneration();
 }
 
-bool AChunkWorld::IsInsideDrawDistance(const FIntVector2& ChunkCoordinates, int x, int y)
+void AChunkWorld::UpdateChunksForGeneration()
 {
-    return x >= ChunkCoordinates.X - DrawDistance && x <= ChunkCoordinates.X + DrawDistance &&
-        y >= ChunkCoordinates.Y - DrawDistance && y <= ChunkCoordinates.Y + DrawDistance;
-}
+    TArray<FIntVector2> NewVisibleChunks;
+    NewVisibleChunks.Reserve( (DrawDistance * 2 + 1) * (DrawDistance * 2 + 1) );
 
-void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
-{
-    const int LoadDistance = DrawDistance + 1;
-
-    // Populate VisibleChunks in a spiral/radial order for better prioritization
-    // Start with the player's chunk
-    if (ChunksData.Contains(CurrentPlayerChunk))
+    // 1. Determine the new visible chunks based on the current player chunk
+    if (auto CenterChunkPtr = ChunksData.Find(CurrentPlayerChunk))
     {
-        AChunkBase* CenterChunk = ChunksData[CurrentPlayerChunk];
-        if (CenterChunk && !CenterChunk->IsMeshInitialized() && !CenterChunk->bIsProcessingMesh)
-        {
-            EnqueueChunkForGeneration(CenterChunk);
-        }
-        VisibleChunks.Add(CurrentPlayerChunk);
+        if(AChunkBase* CenterChunk = *CenterChunkPtr)
+         {
+            NewVisibleChunks.Add(CurrentPlayerChunk);
+            if (!CenterChunk->IsMeshInitialized() && !CenterChunk->bIsProcessingMesh)
+            {
+                ChunksPendingGenerationMap.FindOrAdd(CurrentPlayerChunk, CenterChunk);
+            }
+         }
     }
 
-    // Iterate outwards in rings
-    for (int r = 1; r <= LoadDistance; ++r)
+    // 2. Iterate over the surrounding chunks within the DrawDistance
+    for (int r = 1; r <= DrawDistance; ++r)
     {
         for (int dx = -r; dx <= r; ++dx)
         {
             for (int dy = -r; dy <= r; ++dy)
             {
-                // Only process the outer layer of the current ring
                 if (FMath::Abs(dx) != r && FMath::Abs(dy) != r)
                 {
                     continue;
@@ -123,51 +126,48 @@ void AChunkWorld::ActivateVisibleChunks(const FIntVector2& ChunkCoordinates)
 
                 FIntVector2 Coord(CurrentPlayerChunk.X + dx, CurrentPlayerChunk.Y + dy);
 
-                if (FMath::Abs(dx) > LoadDistance || FMath::Abs(dy) > LoadDistance) continue;
-                
-                if (IsInsideDrawDistance(CurrentPlayerChunk, Coord.X, Coord.Y))
+                if (auto LoadedChunkPtr = ChunksData.Find(Coord))
                 {
-                    if (AChunkBase* LoadedChunk = ChunksData.FindRef(Coord))
+                    AChunkBase* LoadedChunk = *LoadedChunkPtr;
+                    if (LoadedChunk)
                     {
-                        if (!VisibleChunks.Contains(Coord))
-                        {
-                            VisibleChunks.Add(Coord);
-                        }
-                        
+                        NewVisibleChunks.Add(Coord);
+
                         if (!LoadedChunk->IsMeshInitialized() && !LoadedChunk->bIsProcessingMesh)
                         {
-                            EnqueueChunkForGeneration(LoadedChunk);
+                            ChunksPendingGenerationMap.FindOrAdd(Coord, LoadedChunk);
                         }
                     }
                 }
             }
         }
     }
-}
 
-void AChunkWorld::DeactivatePreviousChunks(const TArray<FIntVector2>& PreviousVisibleChunks)
-{
-    for (const FIntVector2& Coord : PreviousVisibleChunks)
+    // Replace the old VisibleChunks list with the newly ordered one
+    VisibleChunks = MoveTemp(NewVisibleChunks);
+
+    // Remove entries for chunks that are no longer visible
+    // or whose actors might have been destroyed
+    TArray<FIntVector2> KeysToRemoveFromPending;
+    for(const auto& Pair : ChunksPendingGenerationMap)
     {
-        if (!VisibleChunks.Contains(Coord))
+        if (!VisibleChunks.Contains(Pair.Key) || !IsValid(Pair.Value))
         {
-            if (AChunkBase* Chunk = ChunksData[Coord])
-            {
-                EnqueueChunkForClearing(Chunk);
-            }
+            KeysToRemoveFromPending.Add(Pair.Key);
         }
+    }
+    for(const FIntVector2& Key : KeysToRemoveFromPending)
+    {
+        ChunksPendingGenerationMap.Remove(Key);
     }
 }
 
 bool AChunkWorld::IsPlayerChunkUpdated()
 {
-    if (!PlayerCharacter)
-    {
-        PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
-    }
     if (!PlayerCharacter) return false;
 
     const FIntVector2 PlayerChunk = FChunkData::GetChunkPosition(this, PlayerCharacter->GetActorLocation());
+
     if (PlayerChunk != CurrentPlayerChunk)
     {
         CurrentPlayerChunk = PlayerChunk;
@@ -176,83 +176,190 @@ bool AChunkWorld::IsPlayerChunkUpdated()
     return false;
 }
 
+void AChunkWorld::UpdateChunksData()
+{
+    if (!TerrainGenerator) return;
+    
+    TSet<FIntVector2> RequiredChunks;
+    TSet<FIntVector2> ChunksToRemove;
+    TArray<FIntVector2> ChunksToAdd;
+
+    // 1. Determine Required Chunks based on LoadDistance
+    for (int32 y = CurrentPlayerChunk.Y - LoadDistance; y <= CurrentPlayerChunk.Y + LoadDistance; ++y)
+    {
+        for (int32 x = CurrentPlayerChunk.X - LoadDistance; x <= CurrentPlayerChunk.X + LoadDistance; ++x)
+        {
+             RequiredChunks.Add(FIntVector2(x, y));
+        }
+    }
+
+     // 2. Identify Chunks to Remove (currently loaded but not required)
+     for (const auto& Pair : ChunksData)
+     {
+         if (!RequiredChunks.Contains(Pair.Key))
+         {
+             ChunksToRemove.Add(Pair.Key);
+         }
+     }
+
+     // 3. Identify Chunks to Add (required but not currently loaded)
+     for (const FIntVector2& RequiredCoord : RequiredChunks)
+     {
+         if (!ChunksData.Contains(RequiredCoord))
+         {
+             ChunksToAdd.Add(RequiredCoord);
+         }
+     }
+
+     // 4. Destroy Chunks that are out of LoadDistance
+     for (const FIntVector2& CoordToRemove : ChunksToRemove)
+     {
+         DestroyChunkActor(CoordToRemove);
+     }
+
+     // 5. Spawn New Chunks that entered LoadDistance
+      ChunksToAdd.Sort([this](const FIntVector2& A, const FIntVector2& B) {
+          return DistSquared(CurrentPlayerChunk, A) < DistSquared(CurrentPlayerChunk, B);
+      });
+
+     for (const FIntVector2& CoordToAdd : ChunksToAdd)
+     {
+         if (!ChunksData.Contains(CoordToAdd))
+         {
+             LoadChunkAtPosition(CoordToAdd);
+         }
+     }
+}
+
+
 AChunkBase* AChunkWorld::LoadChunkAtPosition(const FIntVector2& ChunkCoordinates)
 {
-    if (!TerrainGenerator || !TerrainGenerator->IsInitialized()) return nullptr;
+    if (!TerrainGenerator) return nullptr;
 
-    FVector ChunkWorldPosition(
-        ChunkCoordinates.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-        ChunkCoordinates.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-        0.0f);
+    if (AChunkBase* Restored = TryRestoreSavedChunk(ChunkCoordinates))
+    {
+        return Restored;
+    }
 
-    // Spawn actor
-    AChunkBase* Chunk = GetWorld()->SpawnActor<AChunkBase>(ChunkClass, ChunkWorldPosition, FRotator::ZeroRotator);
+    if (AChunkBase* Existing = GetExistingChunk(ChunkCoordinates))
+    {
+        return Existing;
+    }
+
+    AChunkBase* NewChunk = CreateAndInitializeChunk(ChunkCoordinates);
+    return NewChunk;
+}
+
+AChunkBase* AChunkWorld::TryRestoreSavedChunk(const FIntVector2& ChunkCoordinates)
+{
+    if (!SavedChunkColumns.Contains(ChunkCoordinates))
+    {
+        return nullptr;
+    }
+
+    TArray<FChunkColumn> Columns = SavedChunkColumns.FindAndRemoveChecked(ChunkCoordinates);
+    AChunkBase* Chunk = SpawnChunkActorAt(ChunkCoordinates);
     if (Chunk)
     {
-        Chunk->ChunkPosition = ChunkCoordinates;
-        Chunk->SetParentWorld(this);
-
-        // Generate Column Data 
-        TArray<FChunkColumn> Columns;
-        Columns.SetNum(ChunkSizeSquared);
-
-        FIntVector2 LocalChunkPosition = FChunkData::GetChunkPosition(this, ChunkWorldPosition);
-
-        int32 ChunkSize = FChunkData::GetChunkSize(this);
-
-        for (int x = 0; x < ChunkSize; ++x)
-        {
-            for (int y = 0; y < ChunkSize; ++y)
-            {
-                int GlobalX = LocalChunkPosition.X * FChunkData::GetChunkSize(this) + x;
-                int GlobalY = LocalChunkPosition.Y * FChunkData::GetChunkSize(this) + y;
-
-                // Generate the data for this column
-                FChunkColumn ColumnData = TerrainGenerator->GenerateColumnData(GlobalX, GlobalY);
-
-                // Populate the blocks based on the generated data
-                TerrainGenerator->PopulateColumnBlocks(ColumnData);
-
-                Columns[FChunkData::GetColumnIndex(this, x, y)] = ColumnData;
-            }
-        }
-
-        // Decorate the column with foliage
-        FRandomStream FoliageRandomStream(Seed + ChunkCoordinates.X * 73856093 ^ ChunkCoordinates.Y * 19349663);
-        TerrainGenerator->DecorateChunkWithFoliage(
-        Columns, 
-        ChunkCoordinates,
-        FoliageRandomStream);
-        
-        Chunk->SetColumns(Columns);
-
+        Chunk->SetColumns(MoveTemp(Columns));
         ChunksData.Add(ChunkCoordinates, Chunk);
-        UE_LOG(LogTemp, Verbose, TEXT("Loaded chunk at %d, %d"), ChunkCoordinates.X, ChunkCoordinates.Y);
     }
+    return Chunk;
+}
+
+AChunkBase* AChunkWorld::GetExistingChunk(const FIntVector2& ChunkCoordinates) const
+{
+    if (ChunksData.Contains(ChunkCoordinates))
+    {
+        return ChunksData[ChunkCoordinates];
+    }
+    return nullptr;
+}
+
+AChunkBase* AChunkWorld::CreateAndInitializeChunk(const FIntVector2& ChunkCoordinates)
+{
+    if (!ChunkClass) return nullptr;
+
+    AChunkBase* Chunk = SpawnChunkActorAt(ChunkCoordinates);
+    if (!Chunk) return nullptr;
+
+    // Generate column data
+    const int32 Count = ChunkSize * ChunkSize;
+    TArray<FChunkColumn> Columns;
+    Columns.SetNum(Count);
+
+    for (int32 x = 0; x < ChunkSize; ++x)
+    {
+        for (int32 y = 0; y < ChunkSize; ++y)
+        {
+            int32 idx = FChunkData::GetColumnIndexFromLocal(x, y, ChunkSize);
+            int32 gx  = ChunkCoordinates.X * ChunkSize + x;
+            int32 gy  = ChunkCoordinates.Y * ChunkSize + y;
+
+            Columns[idx] = TerrainGenerator->GenerateColumnData(gx, gy);
+            TerrainGenerator->PopulateColumnBlocks(Columns[idx]);
+        }
+    }
+
+    FRandomStream Stream(Seed + ChunkCoordinates.X * 73856093 ^ ChunkCoordinates.Y * 19349663);
+    TerrainGenerator->DecorateChunkWithFoliage(Columns, ChunkCoordinates, Stream);
+
+    Chunk->SetColumns(Columns);
+    ChunksData.Add(ChunkCoordinates, Chunk);
 
     return Chunk;
 }
 
+AChunkBase* AChunkWorld::SpawnChunkActorAt(const FIntVector2& ChunkCoordinates)
+{
+    FVector Pos(
+        ChunkCoordinates.X * ChunkSize * ScaledBlockSize,
+        ChunkCoordinates.Y * ChunkSize * ScaledBlockSize,
+        0.0f
+    );
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    AChunkBase* Chunk = GetWorld()->SpawnActor<AChunkBase>(
+        ChunkClass, Pos, FRotator::ZeroRotator, SpawnParams 
+    );
+    if (Chunk)
+    {
+        Chunk->ChunkPosition = ChunkCoordinates;
+        Chunk->SetParentWorld(this);
+    }
+    return Chunk;
+}
+
+void AChunkWorld::DestroyChunkActor(const FIntVector2& ChunkCoordinates)
+{
+    if (AChunkBase* ChunkToDestroy = ChunksData.FindRef(ChunkCoordinates))
+    {
+        SavedChunkColumns.Add(ChunkCoordinates, ChunkToDestroy->GetColumns());
+        
+        if (IsValid(ChunkToDestroy))
+        {
+            ChunkToDestroy->Destroy();
+        }
+    }
+
+    ChunksData.Remove(ChunkCoordinates);
+    ChunksPendingGenerationMap.Remove(ChunkCoordinates);
+    VisibleChunks.Remove(ChunkCoordinates);
+}
+
+// Processes the mesh generation queue based on VisibleChunks order.
 void AChunkWorld::ProcessChunksMeshGeneration()
 {
-    // Iterate through VisibleChunks (which should be sorted by proximity)
-    // to pick the next chunk to generate from the ChunksPendingGenerationMap.
     for (const FIntVector2& ChunkCoord : VisibleChunks)
     {
-        // All task slots are busy
-        if (RunningMeshTasks >= MaxConcurrentMeshTasks)
-        {
-            break;
-        }
+        if (RunningMeshTasks >= MaxConcurrentMeshTasks) break;
 
-        if (AChunkBase** ChunkPtr = ChunksPendingGenerationMap.Find(ChunkCoord))
+        if (auto* ChunkPtr = ChunksPendingGenerationMap.Find(ChunkCoord))
         {
             AChunkBase* ChunkToProcess = *ChunkPtr;
-            if (ChunkToProcess && ChunkToProcess->IsValidLowLevel() && !ChunkToProcess->IsPendingKillPending())
+            if (ChunkToProcess && IsValid(ChunkToProcess) && !ChunkToProcess->IsPendingKillPending() && !ChunkToProcess->bIsProcessingMesh)
             {
-                // Remove from pending map as we are about to process it
                 ChunksPendingGenerationMap.Remove(ChunkCoord);
-
                 ChunkToProcess->bIsProcessingMesh = true;
                 ++RunningMeshTasks;
                 ChunkToProcess->RegenerateMeshAsync();
@@ -264,93 +371,74 @@ void AChunkWorld::ProcessChunksMeshGeneration()
         }
     }
 
-    // If there are still task slots and chunks in ChunksPendingGenerationMap
-    // that were not in VisibleChunks, process them.
-    TArray<FIntVector2> KeysToRemove;
-    for (auto It = ChunksPendingGenerationMap.CreateIterator(); It && RunningMeshTasks < MaxConcurrentMeshTasks; ++It)
+    // If slots are still available, process any remaining chunks in the pending map
+    if (RunningMeshTasks < MaxConcurrentMeshTasks && ChunksPendingGenerationMap.Num() > 0)
     {
-        AChunkBase* ChunkToProcess = It.Value();
-        if (ChunkToProcess && ChunkToProcess->IsValidLowLevel() && !ChunkToProcess->IsPendingKillPending())
+        TArray<FIntVector2> KeysToRemove;
+        for (auto It = ChunksPendingGenerationMap.CreateIterator(); It && RunningMeshTasks < MaxConcurrentMeshTasks; ++It)
         {
-            ChunkToProcess->bIsProcessingMesh = true;
-            ++RunningMeshTasks;
-            ChunkToProcess->RegenerateMeshAsync();
-            KeysToRemove.Add(It.Key());
+            AChunkBase* ChunkToProcess = It.Value();
+            if (ChunkToProcess && IsValid(ChunkToProcess) && !ChunkToProcess->IsPendingKillPending() && !ChunkToProcess->bIsProcessingMesh)
+            {
+                ChunkToProcess->bIsProcessingMesh = true;
+                ++RunningMeshTasks;
+                ChunkToProcess->RegenerateMeshAsync();
+                KeysToRemove.Add(It.Key());
+            }
+            else
+            {
+                KeysToRemove.Add(It.Key());
+            }
         }
-        else
+        
+        // Remove processed/invalid chunks from the map
+        for (const FIntVector2& Key : KeysToRemove)
         {
-            KeysToRemove.Add(It.Key());
+            ChunksPendingGenerationMap.Remove(Key);
         }
     }
-    for (const FIntVector2& Key : KeysToRemove)
-    {
-        ChunksPendingGenerationMap.Remove(Key);
-    }
-
 
     UnPauseGameIfChunksLoadingComplete();
 }
 
-void AChunkWorld::EnqueueChunkForGeneration(AChunkBase* Chunk)
-{
-    if (Chunk && !Chunk->bIsProcessingMesh && !Chunk->IsMeshInitialized())
-    {
-        // Add to map if not already present. If present, it means it's already queued.
-        if (!ChunksPendingGenerationMap.Contains(Chunk->ChunkPosition))
-        {
-            ChunksPendingGenerationMap.Add(Chunk->ChunkPosition, Chunk);
-        }
-    }
-}
-
-void AChunkWorld::ProcessChunksMeshClear(float DeltaTime)
-{
-    CurrentClearChunkDelay -= DeltaTime;
-
-    if (CurrentClearChunkDelay <= 0.f && !ChunkClearQueue.IsEmpty())
-    {
-        AChunkBase* Chunk = nullptr;
-        if (ChunkClearQueue.Dequeue(Chunk) && Chunk)
-        {
-            Chunk->ClearMesh();
-        }
-        CurrentClearChunkDelay = ClearChunkDelay;
-    }
-}
-
-void AChunkWorld::EnqueueChunkForClearing(AChunkBase* Chunk)
-{
-    if (Chunk && Chunk->IsMeshInitialized() && !Chunk->bIsProcessingMesh)
-    {
-        ChunkClearQueue.Enqueue(Chunk);
-    }
-}
 
 void AChunkWorld::SortVisibleChunksByDistance()
 {
     if (!PlayerCharacter) return;
-        FVector PlayerLocation = PlayerCharacter->GetActorLocation();
+    FVector PlayerLocation = PlayerCharacter->GetActorLocation();
     
-        VisibleChunks.Sort([this, PlayerLocation](const FIntVector2& A, const FIntVector2& B)
-        {
-            FVector WorldPosA(
-                A.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-                A.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-                0.0f);
-            FVector WorldPosB(
-                B.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-                B.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
-                0.0f);
+    VisibleChunks.Sort([this, PlayerLocation](const FIntVector2& A, const FIntVector2& B)
+    {
+        FVector WorldPosA(
+            A.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
+            A.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
+            0.0f);
+        FVector WorldPosB(
+            B.X * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
+            B.Y * FChunkData::GetChunkSize(this) * FChunkData::GetScaledBlockSize(this),
+            0.0f);
             
-            return FVector::DistSquared(PlayerLocation, WorldPosA) < FVector::DistSquared(PlayerLocation, WorldPosB);
-        });
+        return FVector::DistSquared(PlayerLocation, WorldPosA) < FVector::DistSquared(PlayerLocation, WorldPosB);
+    });
 }
 
 void AChunkWorld::UnPauseGameIfChunksLoadingComplete() const
 {
-    if (UGameplayStatics::IsGamePaused(GetWorld()) && ChunksPendingGenerationMap.IsEmpty() && RunningMeshTasks == 0)
+    if (UGameplayStatics::IsGamePaused(GetWorld()) && !ChunksPendingGenerationMap.IsEmpty())
     {
         UGameplayStatics::SetGamePaused(GetWorld(), false);
-        UE_LOG(LogTemp, Log, TEXT("All pending initial chunks processed. Unpausing game."));
+        UE_LOG(LogTemp, Log, TEXT("Initial chunk generation complete. Unpausing game."));
     }
+}
+
+bool AChunkWorld::IsWithinLoadDistance(const FIntVector2& ChunkCoordinates) const
+{
+    float DistSq = DistSquared(CurrentPlayerChunk, ChunkCoordinates);
+    return DistSq <= (LoadDistance * LoadDistance);
+}
+
+bool AChunkWorld::IsWithinDrawDistance(const FIntVector2& ChunkCoordinates) const
+{
+     float DistSq = DistSquared(CurrentPlayerChunk, ChunkCoordinates);
+     return DistSq <= (DrawDistance * DrawDistance);
 }

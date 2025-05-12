@@ -27,6 +27,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data")
 	int Y;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
+	float Temperature;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
+	float Humidity;
+	
 private:
 	// UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
 	// ETemperatureType TemperatureType;
@@ -34,11 +39,6 @@ private:
 	// EHumidityType HumidityType;
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
 	EBiomeType BiomeType;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
-	float Temperature;
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
-	float Humidity;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Chunk Column Data", meta = (AllowPrivateAccess = "true"))
 	float Continentalness;
@@ -63,11 +63,6 @@ public:
 	EBiomeType GetBiomeType() const { return BiomeType; }
 
 	void SetBiomeType(EBiomeType NewBiomeType) { BiomeType = NewBiomeType;}
-	void SetClimateData(float NewTemperature, float NewHumidity)
-	{
-		Temperature = NewTemperature;
-		Humidity = NewHumidity;
-	}
 	
 	void SetGenerationData(const FTerrainParameterData& NewTerrainData)
 	{

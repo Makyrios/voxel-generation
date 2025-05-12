@@ -380,7 +380,7 @@ AChunkBase* AChunkBase::GetAdjacentChunk(const FIntVector& Position, FIntVector*
 		*outAdjChunkBlockPosition = BlockPosition;
 	}
 	
-	if (AChunkBase* const* FoundChunkPtr = ParentWorld->GetChunksData().Find(AdjChunkPos))
+	if (auto* FoundChunkPtr = ParentWorld->GetChunksData().Find(AdjChunkPos))
 	{
 		return *FoundChunkPtr;
 	}

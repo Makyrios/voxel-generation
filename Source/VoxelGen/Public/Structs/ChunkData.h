@@ -15,6 +15,7 @@ public:
 	static int32 GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, int32 Z);
 
 	static int32 GetColumnIndex(const UObject* WorldContext, int32 X, int32 Y);
+	static int32 GetColumnIndexFromLocal(int32 X, int32 Y, int32 ChunkSize);
 	
 	static FIntVector GetLocalBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition);
 

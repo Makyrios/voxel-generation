@@ -59,7 +59,12 @@ int32 FChunkData::GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, i
      return X + (Y * Size);
  }
 
- FIntVector FChunkData::GetLocalBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition) {
+int32 FChunkData::GetColumnIndexFromLocal(int32 X, int32 Y, int32 ChunkSize)
+{
+    return X + (Y * ChunkSize);
+}
+
+FIntVector FChunkData::GetLocalBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition) {
      int32 Size = GetChunkSize(WorldContext);
      int32 Height = GetChunkHeight(WorldContext);
      return FIntVector(
