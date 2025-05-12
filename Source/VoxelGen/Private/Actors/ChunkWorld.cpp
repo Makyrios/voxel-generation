@@ -25,11 +25,6 @@ void AChunkWorld::BeginPlay()
 {
     Super::BeginPlay();
 
-    LoadDistance = DrawDistance + 1;
-
-    ChunkSize = FChunkData::GetChunkSize(this);
-    ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
-
     InitializeWorld();
 
     bWorldInitialized = true;
@@ -55,6 +50,12 @@ void AChunkWorld::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AChunkWorld::InitializeWorld()
 {
+    LoadDistance = DrawDistance + 1;
+
+    Seed = FChunkData::GetSeed(this);
+    ChunkSize = FChunkData::GetChunkSize(this);
+    ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
+    
     PlayerCharacter = Cast<AVoxelGenerationCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
     if (!PlayerCharacter) return;
 
@@ -88,6 +89,24 @@ void AChunkWorld::Tick(float DeltaTime)
 
 void AChunkWorld::RegenerateWorld()
 {
+    for (const auto& Pair : ChunksData)
+    {
+        DestroyChunkActor(Pair.Key);
+    }
+    
+    ChunksData.Empty();
+    SavedChunkColumns.Empty();
+    ChunksPendingGenerationMap.Empty();
+    VisibleChunks.Empty();
+
+    Seed = FChunkData::GetSeed(this);
+    ChunkSize = FChunkData::GetChunkSize(this);
+    ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
+    if (TerrainGenerator)
+    {
+        TerrainGenerator->UpdateSeed(Seed);
+    }
+    
     UpdateChunksData();
     UpdateChunksForGeneration();
     SortVisibleChunksByDistance();

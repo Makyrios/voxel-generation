@@ -34,6 +34,7 @@ protected:
 	void DestroyBlock();
 	void SpawnBlock();
 
+	UFUNCTION(BlueprintCallable)
 	void Fly();
 
 	void Ascend();

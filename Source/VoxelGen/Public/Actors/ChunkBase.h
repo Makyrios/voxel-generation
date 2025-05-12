@@ -7,7 +7,6 @@
 #include "GameFramework/Actor.h"
 #include "Structs/BlockSettings.h"
 #include "Structs/ChunkColumn.h"
-#include "Structs/ChunkData.h"
 #include "ChunkBase.generated.h"
 
 enum class EDirection;

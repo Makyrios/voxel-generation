@@ -8,7 +8,7 @@
 
 enum class EFastNoise_NoiseType : uint8;
 
-UCLASS()
+UCLASS(BlueprintType)
 class VOXELGEN_API UNoiseOctaveSettingsAsset : public UDataAsset
 {
 	GENERATED_BODY()

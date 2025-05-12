@@ -8,6 +8,7 @@
 #include "VoxelGen/Enums.h"
 #include "TerrainGenerator.generated.h"
 
+class UNoiseGenerationPreset;
 // Forward Declarations
 class AChunkWorld;
 class UFoliageGenerator;
@@ -27,7 +28,7 @@ public:
     FChunkColumn GenerateColumnData(int GlobalX, int GlobalY);
 
     // Populates blocks based on biome and height (logic remains similar)
-    void PopulateColumnBlocks(FChunkColumn& ColumnData);
+    void PopulateColumnBlocks(FChunkColumn& ColumnData) const;
 
     // Foliage placement logic remains similar
     void DecorateChunkWithFoliage(
@@ -37,6 +38,13 @@ public:
     ) const;
 
     bool IsNoiseInitialized() const { return bNoiseInitialized; }
+
+	void UpdateSeed(int32 NewSeed) const;
+    UFUNCTION(BlueprintCallable)
+	void SetNoisePreset(UNoiseGenerationPreset* NewPreset);
+
+    // Set parent world for noise initialization
+    void SetParentWorld(AChunkWorld* World) { ParentWorld = World; }
 
 protected:
     virtual void BeginPlay() override;
@@ -78,15 +86,17 @@ public:
 	TObjectPtr<UDataTable> BiomesTable;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	TObjectPtr<UNoiseOctaveSettingsAsset> ContinentalnessNoiseSettings;
-	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	TObjectPtr<UNoiseOctaveSettingsAsset> ErosionNoiseSettings;
-	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	TObjectPtr<UNoiseOctaveSettingsAsset> WeirdnessNoiseSettings;
-	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	TObjectPtr<UNoiseOctaveSettingsAsset> TemperatureNoiseSettings;
-	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	TObjectPtr<UNoiseOctaveSettingsAsset> HumidityNoiseSettings;
+	TObjectPtr<UNoiseGenerationPreset> NoiseGenerationPreset;
+	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
+	// TObjectPtr<UNoiseOctaveSettingsAsset> ContinentalnessNoiseSettings;
+	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
+	// TObjectPtr<UNoiseOctaveSettingsAsset> ErosionNoiseSettings;
+	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
+	// TObjectPtr<UNoiseOctaveSettingsAsset> WeirdnessNoiseSettings;
+	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
+	// TObjectPtr<UNoiseOctaveSettingsAsset> TemperatureNoiseSettings;
+	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
+	// TObjectPtr<UNoiseOctaveSettingsAsset> HumidityNoiseSettings;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Terrain Generation")
 	int32 WaterThreshold = 55;

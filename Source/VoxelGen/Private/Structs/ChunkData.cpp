@@ -13,15 +13,6 @@ namespace {
     }
 }
 
-int32 FChunkData::GetWorldSize(const UObject* WorldContext) {
-    UWorldGameInstance* GI = GetWorldGI(WorldContext);
-    return GI ? GI->WorldSize : 0;
-}
-
-int32 FChunkData::GetWorldSizeInColumns(const UObject* WorldContext) {
-    return GetWorldSize(WorldContext) * GetChunkSize(WorldContext);
-}
-
 int32 FChunkData::GetChunkSize(const UObject* WorldContext) {
     UWorldGameInstance* GI = GetWorldGI(WorldContext);
     return GI ? GI->ChunkSize : 0;
@@ -45,6 +36,12 @@ float FChunkData::GetBlockSize(const UObject* WorldContext) {
  float FChunkData::GetScaledBlockSize(const UObject* WorldContext) {
      return GetBlockSize(WorldContext) * GetBlockScale(WorldContext);
  }
+
+int32 FChunkData::GetSeed(const UObject* WorldContext)
+{
+    UWorldGameInstance* GI = GetWorldGI(WorldContext);
+    return GI ? GI->Seed : 0;
+}
 
 int32 FChunkData::GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, int32 Z) {
     int32 Size = GetChunkSize(WorldContext);

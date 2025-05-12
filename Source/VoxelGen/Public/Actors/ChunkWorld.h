@@ -24,6 +24,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void RegenerateWorld();
 
+    UFUNCTION(BlueprintPure)
+    UTerrainGenerator* GetTerrainGenerator() const { return TerrainGenerator; }
+
 
 protected:
     virtual void BeginPlay() override;
@@ -55,11 +58,10 @@ private:
     bool IsWithinDrawDistance(const FIntVector2& ChunkCoordinates) const;
 
 public:
-    UPROPERTY(EditAnywhere, Category = "Settings|Chunk World", meta = (ClampMin = "0", UIMin = "0"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World", meta = (ClampMin = "0", UIMin = "0"))
     int32 DrawDistance = 5;
     int32 LoadDistance = 6;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World")
     int32 Seed = 1000;
     
 private:
@@ -71,7 +73,7 @@ private:
     UPROPERTY(EditAnywhere, Category = "Components")
     TObjectPtr<UTerrainGenerator> TerrainGenerator;
 
-    UPROPERTY(EditAnywhere, Category = "Settings|Chunk World")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Chunk World", meta = (AllowPrivateAccess = "true"))
     TSubclassOf<AChunkBase> ChunkClass;
 
     // Runtime Data

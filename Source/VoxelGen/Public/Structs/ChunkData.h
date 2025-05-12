@@ -12,6 +12,8 @@ struct FChunkData
 	GENERATED_BODY()
 
 public:
+	static int32 GetSeed(const UObject* WorldContext);
+	
 	static int32 GetBlockIndex(const UObject* WorldContext, int32 X, int32 Y, int32 Z);
 
 	static int32 GetColumnIndex(const UObject* WorldContext, int32 X, int32 Y);
@@ -24,10 +26,6 @@ public:
 	static FIntVector2 GetChunkContainingBlockPosition(const UObject* WorldContext, const FIntVector& WorldBlockPosition);
 
 	static FIntVector2 GetChunkPosition(const UObject* WorldContext, const FVector& WorldPosition);
-
-	static int32 GetWorldSize(const UObject* WorldContext);
-
-	static int32 GetWorldSizeInColumns(const UObject* WorldContext);
 
 	static int32 GetChunkSize(const UObject* WorldContext);
 	

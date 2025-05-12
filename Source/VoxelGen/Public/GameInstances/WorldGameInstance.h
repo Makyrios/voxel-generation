@@ -13,7 +13,7 @@ class VOXELGEN_API UWorldGameInstance : public UGameInstance
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
-	int32 WorldSize = 32;
+	int32 Seed = 1000;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
 	int32 ChunkSize = 32;
