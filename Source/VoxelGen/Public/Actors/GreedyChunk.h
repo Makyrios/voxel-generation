@@ -13,13 +13,13 @@ class VOXELGEN_API AGreedyChunk final : public AChunkBase
 	
 	struct FMask
 	{
-		// const FBlockSettings* BlockProperties = nullptr;
-		EBlock Block = EBlock::Air;
+		FBlockSettings BlockProperties;
+		
 		int8 Normal = 0; // -1 or 1 for direction relative to sweep
 
 		FMask() = default;
-		FMask(EBlock InBlock, int8 InNormal)
-			: Block(InBlock), Normal(InNormal) {}
+		FMask(const FBlockSettings& InBlockProperties, int8 InNormal)
+			: BlockProperties(InBlockProperties), Normal(InNormal) {}
 	};
 
 private:

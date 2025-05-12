@@ -47,9 +47,14 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	virtual void GenerateMesh() PURE_VIRTUAL(&AChunkBase::GenerateMesh);
+	void CreateCrossPlanes(
+		const FIntVector& BlockPos,
+		EBlock BlockType,
+		const FBlockSettings& Settings
+	);
 
 	int GetTextureIndex(EBlock BlockType, const FVector& Normal) const;
-	const FBlockSettings* GetBlockData(EBlock BlockType) const;
+	FBlockSettings GetBlockData(EBlock BlockType) const;
 
 	bool ShouldRenderFace(const FIntVector& Position) const;
 	bool ShouldRenderFace(int X, int Y, int Z) const;

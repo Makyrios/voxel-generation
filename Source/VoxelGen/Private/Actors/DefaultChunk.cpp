@@ -3,7 +3,6 @@
 
 #include "Actors/DefaultChunk.h"
 
-#include "Actors/ChunkWorld.h"
 #include "VoxelGen/Enums.h"
 
 
@@ -30,23 +29,23 @@ void ADefaultChunk::GenerateMesh()
             {
                 FIntVector CurrentBlockPos(x, y, z);
                 EBlock CurrentBlockType = GetBlockAtPosition(CurrentBlockPos);
-                const FBlockSettings* CurrentBlockProperties = GetBlockData(CurrentBlockType);
+                FBlockSettings CurrentBlockProperties = GetBlockData(CurrentBlockType);
 
                 // Skip processing for Air blocks themselves or blocks with no defined properties
-                if (CurrentBlockType == EBlock::Air || !CurrentBlockProperties)
+                if (CurrentBlockType == EBlock::Air )
                 {
                     continue;
                 }
 
-            	if (CurrentBlockProperties->RenderMode == EBlockRenderMode::Cube)
+            	if (CurrentBlockProperties.RenderMode == EBlockRenderMode::Cube)
             	{
             		CreateCubePlanes(CurrentBlockPos, CurrentBlockType, CurrentBlockProperties);
 				}
-            	else if (CurrentBlockProperties->RenderMode == EBlockRenderMode::CrossPlanes)
+            	else if (CurrentBlockProperties.RenderMode == EBlockRenderMode::CrossPlanes)
             	{
             		CreateCrossPlanes(CurrentBlockPos, CurrentBlockType, CurrentBlockProperties);
             	}
-				else if (CurrentBlockProperties->RenderMode == EBlockRenderMode::CustomMesh)
+				else if (CurrentBlockProperties.RenderMode == EBlockRenderMode::CustomMesh)
 				{
 				}
             }
@@ -54,100 +53,7 @@ void ADefaultChunk::GenerateMesh()
     }
 }
 
-void ADefaultChunk::CreateCrossPlanes(const FIntVector& CurrentBlockPos, EBlock Block, const FBlockSettings*& BlockSettings)
-{
-	if (!ParentWorld) return;
-	
-	// get mesh buffer & vertex counter
-    FChunkMeshData& ChunkMeshData = GetMeshDataForBlock(Block);
-    int& VertexCount = GetVertexCountForBlock(Block);
-
-	// Pick a random texture variant for this block
-	int32 Seed = ParentWorld->Seed
-		   ^ (CurrentBlockPos.X * 73856093)
-		   ^ (CurrentBlockPos.Y * 19349663)
-		   ^ (CurrentBlockPos.Z * 83492791);
-	FRandomStream Stream(Seed);
-	
-	int32 NumVariants = BlockSettings->NumTextureVariants;
-	int32 VariantIndex = Stream.RandRange(0, NumVariants-1);
-
-    // world space origin of this block
-    const float ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
-	
-    FVector Origin((CurrentBlockPos.X + 0.5f) * ScaledBlockSize, (CurrentBlockPos.Y + 0.5f) * ScaledBlockSize, CurrentBlockPos.Z * ScaledBlockSize);
-
-    // size of the planes
-    float HalfWidth = 0.5f * BlockSettings->RenderScale * ScaledBlockSize;
-    float Height = BlockSettings->RenderHeight * ScaledBlockSize;
-
-    // Define the four corners of a plane centered at Origin + (0,0,H/2)
-    FVector A(-HalfWidth,  0, Height * 0.5f);
-    FVector B( HalfWidth,  0, Height * 0.5f);
-    FVector C( HalfWidth,  0,    0);
-    FVector D(-HalfWidth,  0,    0);
-
-	// Randomize rotation
-	if (BlockSettings->RandomRotation)
-	{
-		float Yaw = Stream.FRandRange(0.f, 360.f);
-		FQuat Rot(FVector::UpVector, FMath::DegreesToRadians(Yaw));
-		
-		A = Rot.RotateVector(A);
-		B = Rot.RotateVector(B);
-		C = Rot.RotateVector(C);
-		D = Rot.RotateVector(D);
-	}
-
-    // Two quads, rotated 90° around Z
-    TArray<FVector> Verts;
-    // Plane 1 (along X)
-    Verts.Add(Origin + A);
-    Verts.Add(Origin + B);
-    Verts.Add(Origin + C);
-    Verts.Add(Origin + D);
-
-    // Plane 2 (along Y) — just swap X/Y
-    Verts.Add(Origin + FVector( 0, -HalfWidth, Height * 0.5f));
-    Verts.Add(Origin + FVector( 0,  HalfWidth, Height * 0.5f));
-    Verts.Add(Origin + FVector( 0,  HalfWidth,    0));
-    Verts.Add(Origin + FVector( 0, -HalfWidth,    0));
-
-    // Append vertices
-    ChunkMeshData.Vertices.Append(Verts);
-	
-	
-    // UVs (same for both quads)
-    for (int i = 0; i < 2; ++i)
-    {
-        ChunkMeshData.UV.Add(FVector2D(1, 0));
-        ChunkMeshData.UV.Add(FVector2D(0, 0));
-        ChunkMeshData.UV.Add(FVector2D(0, 1));
-        ChunkMeshData.UV.Add(FVector2D(1, 1));
-    }
-
-    // Triangles (two per quad)
-    for (int q = 0; q < 2; ++q)
-    {
-        int base = VertexCount + q * 4;
-        ChunkMeshData.Triangles.Append({
-            base+0, base+1, base+2,
-            base+2, base+3, base+0
-        });
-    }
-
-    FVector Normal(0, 0, 1);
-    for (int i = 0; i < 8; ++i)
-    {
-        ChunkMeshData.Normals.Add(Normal);
-        FColor col(0,0,0, VariantIndex);
-        ChunkMeshData.Colors.Add(col);
-    }
-
-    VertexCount += 8;
-}
-
-void ADefaultChunk::CreateCubePlanes(const FIntVector& CurrentBlockPos, EBlock Block, const FBlockSettings*& BlockSettings)
+void ADefaultChunk::CreateCubePlanes(const FIntVector& CurrentBlockPos, EBlock Block, const FBlockSettings& BlockSettings)
 {
 	// Iterate through 6 directions
 	for (int i = 0; i < 6; ++i)
@@ -162,13 +68,12 @@ void ADefaultChunk::CreateCubePlanes(const FIntVector& CurrentBlockPos, EBlock B
                     	
 			// Apply culling rules
 			// Cull internal faces of identical transparent blocks (water)
-			if (BlockSettings->MaterialType == EBlockMaterialType::Water)
+			if (BlockSettings.MaterialType == EBlockMaterialType::Water)
 			{
 				EBlock NeighborTypeIfActuallyChecked = GetBlockAtPosition(NeighborPos);
-				const FBlockSettings* NeighborPropsIfActuallyChecked = GetBlockData(NeighborTypeIfActuallyChecked);
+				FBlockSettings NeighborPropsIfActuallyChecked = GetBlockData(NeighborTypeIfActuallyChecked);
 
-				if (NeighborPropsIfActuallyChecked &&
-					NeighborPropsIfActuallyChecked->MaterialType == EBlockMaterialType::Water &&
+				if (NeighborPropsIfActuallyChecked.MaterialType == EBlockMaterialType::Water &&
 					Block == NeighborTypeIfActuallyChecked)
 				{
 					bActuallyDrawThisFace = false;
@@ -183,10 +88,8 @@ void ADefaultChunk::CreateCubePlanes(const FIntVector& CurrentBlockPos, EBlock B
 	}
 }
 
-void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position, EBlock BlockType, const FBlockSettings* BlockProperties)
+void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position, EBlock BlockType, const FBlockSettings& BlockProperties)
 {
-    if (!BlockProperties) return;
-
     FChunkMeshData& TargetMeshData = GetMeshDataForBlock(BlockType);
     int& TargetVertexCount = GetVertexCountForBlock(BlockType);
 
@@ -214,9 +117,9 @@ void ADefaultChunk::CreateFace(EDirection Direction, const FIntVector& Position,
     FVector Normal = GetNormal(Direction);
     // Get texture index from FBlockSettings based on face normal
     int TextureIndexValue = 255; // Default/error texture
-    if (Normal == FVector::UpVector) TextureIndexValue = BlockProperties->TextureData.TopFaceTexture;
-    else if (Normal == FVector::DownVector) TextureIndexValue = BlockProperties->TextureData.BottomFaceTexture;
-    else TextureIndexValue = BlockProperties->TextureData.SideFaceTexture;
+    if (Normal == FVector::UpVector) TextureIndexValue = BlockProperties.TextureData.TopFaceTexture;
+    else if (Normal == FVector::DownVector) TextureIndexValue = BlockProperties.TextureData.BottomFaceTexture;
+    else TextureIndexValue = BlockProperties.TextureData.SideFaceTexture;
 
     const FColor Color(0, 0, 0, TextureIndexValue);
     TargetMeshData.Colors.Add(Color);

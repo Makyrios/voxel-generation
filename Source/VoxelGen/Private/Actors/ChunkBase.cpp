@@ -116,23 +116,115 @@ FIntVector AChunkBase::GetPositionInDirection(EDirection Direction, const FIntVe
 	}
 }
 
-int AChunkBase::GetTextureIndex(EBlock BlockType, const FVector& Normal) const
+void AChunkBase::CreateCrossPlanes(const FIntVector& BlockPos, EBlock BlockType, const FBlockSettings& Settings)
 {
-	const FBlockSettings* Data = GetBlockData(BlockType);
-	if (!Data) return 255; // Default/Error texture
+	if (!ParentWorld) return;
+	
+	// get mesh buffer & vertex counter
+    FChunkMeshData& ChunkMeshData = GetMeshDataForBlock(BlockType);
+    int& VertexCount = GetVertexCountForBlock(BlockType);
 
-	// Simplified example, assumes your texture array matches this order conceptually
-	if (Normal == FVector::UpVector) return Data->TextureData.TopFaceTexture;
-	if (Normal == FVector::DownVector) return Data->TextureData.BottomFaceTexture;
-	return Data->TextureData.SideFaceTexture;
+	// Pick a random texture variant for this block
+	int32 Seed = ParentWorld->Seed
+		   ^ (BlockPos.X * 73856093)
+		   ^ (BlockPos.Y * 19349663)
+		   ^ (BlockPos.Z * 83492791);
+	FRandomStream Stream(Seed);
+	
+	int32 NumVariants = Settings.NumTextureVariants;
+	int32 VariantIndex = Stream.RandRange(0, NumVariants-1);
+
+    // world space origin of this block
+    const float ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
+	
+    FVector Origin((BlockPos.X + 0.5f) * ScaledBlockSize, (BlockPos.Y + 0.5f) * ScaledBlockSize, BlockPos.Z * ScaledBlockSize);
+
+    // size of the planes
+    float HalfWidth = 0.5f * Settings.RenderScale * ScaledBlockSize;
+    float Height = Settings.RenderHeight * ScaledBlockSize;
+
+    // Define the four corners of a plane centered at Origin + (0,0,H/2)
+    FVector A(-HalfWidth,  0, Height * 0.5f);
+    FVector B( HalfWidth,  0, Height * 0.5f);
+    FVector C( HalfWidth,  0,    0);
+    FVector D(-HalfWidth,  0,    0);
+
+	// Randomize rotation
+	if (Settings.RandomRotation)
+	{
+		float Yaw = Stream.FRandRange(0.f, 360.f);
+		FQuat Rot(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+		
+		A = Rot.RotateVector(A);
+		B = Rot.RotateVector(B);
+		C = Rot.RotateVector(C);
+		D = Rot.RotateVector(D);
+	}
+
+    // Two quads, rotated 90° around Z
+    TArray<FVector> Verts;
+    // Plane 1 (along X)
+    Verts.Add(Origin + A);
+    Verts.Add(Origin + B);
+    Verts.Add(Origin + C);
+    Verts.Add(Origin + D);
+
+    // Plane 2 (along Y) — just swap X/Y
+    Verts.Add(Origin + FVector( 0, -HalfWidth, Height * 0.5f));
+    Verts.Add(Origin + FVector( 0,  HalfWidth, Height * 0.5f));
+    Verts.Add(Origin + FVector( 0,  HalfWidth,    0));
+    Verts.Add(Origin + FVector( 0, -HalfWidth,    0));
+
+    // Append vertices
+    ChunkMeshData.Vertices.Append(Verts);
+	
+	
+    // UVs (same for both quads)
+    for (int i = 0; i < 2; ++i)
+    {
+        ChunkMeshData.UV.Add(FVector2D(1, 0));
+        ChunkMeshData.UV.Add(FVector2D(0, 0));
+        ChunkMeshData.UV.Add(FVector2D(0, 1));
+        ChunkMeshData.UV.Add(FVector2D(1, 1));
+    }
+
+    // Triangles (two per quad)
+    for (int q = 0; q < 2; ++q)
+    {
+        int base = VertexCount + q * 4;
+        ChunkMeshData.Triangles.Append({
+            base+0, base+1, base+2,
+            base+2, base+3, base+0
+        });
+    }
+
+    FVector Normal(0, 0, 1);
+    for (int i = 0; i < 8; ++i)
+    {
+        ChunkMeshData.Normals.Add(Normal);
+        FColor col(0,0,0, VariantIndex);
+        ChunkMeshData.Colors.Add(col);
+    }
+
+    VertexCount += 8;
 }
 
-const FBlockSettings* AChunkBase::GetBlockData(EBlock BlockType) const
+int AChunkBase::GetTextureIndex(EBlock BlockType, const FVector& Normal) const
+{
+	FBlockSettings Data = GetBlockData(BlockType);
+
+	// Simplified example, assumes your texture array matches this order conceptually
+	if (Normal == FVector::UpVector) return Data.TextureData.TopFaceTexture;
+	if (Normal == FVector::DownVector) return Data.TextureData.BottomFaceTexture;
+	return Data.TextureData.SideFaceTexture;
+}
+
+FBlockSettings AChunkBase::GetBlockData(EBlock BlockType) const
 {
 	if (!BlockDataTable)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("BlockDataTable is not set in ChunkBase!"));
-		return nullptr;
+		return FBlockSettings();
 	}
 	
 	const FString EnumString = UEnum::GetValueAsString(BlockType);
@@ -142,13 +234,13 @@ const FBlockSettings* AChunkBase::GetBlockData(EBlock BlockType) const
 	if (!FoundRow)
 	{
 		// Fallback for Air or undefined blocks
-		static const FBlockSettings AirDataDefault;
-		if (BlockType == EBlock::Air) return &AirDataDefault;
+		const FBlockSettings AirDataDefault;
+		if (BlockType == EBlock::Air) return AirDataDefault;
 
 		UE_LOG(LogTemp, Warning, TEXT("BlockData not found for type: %s"), *RowName.ToString());
-		return nullptr;
+		return FBlockSettings();
 	}
-	return FoundRow;
+	return *FoundRow;
 }
 
 bool AChunkBase::ShouldRenderFace(const FIntVector& Position) const
@@ -156,9 +248,9 @@ bool AChunkBase::ShouldRenderFace(const FIntVector& Position) const
 	EBlock Block = GetBlockAtPosition(Position);
 	if (Block == EBlock::Air) return true;
 
-	const FBlockSettings* Data = GetBlockData(Block);
+	FBlockSettings Data = GetBlockData(Block);
 	// A block is considered "air" for culling purposes if it's not solid OR if it's transparent.
-	return (Data && (!Data->bIsSolid || Data->bIsTransparent));
+	return (!Data.bIsSolid || Data.bIsTransparent);
 }
 
 bool AChunkBase::ShouldRenderFace(int X, int Y, int Z) const
@@ -413,6 +505,7 @@ void AChunkBase::DestroyBlock(const FIntVector& LocalChunkBlockPosition)
 	if (!IsWithinChunkBounds(LocalChunkBlockPosition)) return;
 
 	bCanChangeBlocks = false;
+	
 	if (GetBlockAtPosition(GetPositionInDirection(EDirection::Up, LocalChunkBlockPosition)) == EBlock::Water
 		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Left, LocalChunkBlockPosition)) == EBlock::Water
 		|| GetBlockAtPosition(GetPositionInDirection(EDirection::Right, LocalChunkBlockPosition)) == EBlock::Water
@@ -424,6 +517,13 @@ void AChunkBase::DestroyBlock(const FIntVector& LocalChunkBlockPosition)
 	else
 	{
 		SetBlockAtPosition(LocalChunkBlockPosition, EBlock::Air);
+		
+		// Destroy grass foliage block above the destroyed block
+		FIntVector UpBlockPos = GetPositionInDirection(EDirection::Up, LocalChunkBlockPosition);
+		if (GetBlockAtPosition(UpBlockPos) == EBlock::GrassFoliage)
+		{
+			SetBlockAtPosition(UpBlockPos, EBlock::Air);
+		}
 	}
 	
 	RegenerateMeshAsync();
@@ -431,42 +531,37 @@ void AChunkBase::DestroyBlock(const FIntVector& LocalChunkBlockPosition)
 
 FChunkMeshData& AChunkBase::GetMeshDataForBlock(EBlock BlockType)
 {
-	if (const FBlockSettings* Settings = GetBlockData(BlockType))
+	FBlockSettings Settings = GetBlockData(BlockType);
+	
+	switch (Settings.MaterialType)
 	{
-		switch (Settings->MaterialType)
-		{
-		case EBlockMaterialType::Water:
-			return WaterChunkMeshData;
-		case EBlockMaterialType::Leaves:
-			return LeavesChunkMeshData;
-		case EBlockMaterialType::Opaque:
-			return OpaqueChunkMeshData;
-		case EBlockMaterialType::Grass:
-			return GrassChunkMeshData;
-		default:
-			return OpaqueChunkMeshData;
-		}
+	case EBlockMaterialType::Water:
+		return WaterChunkMeshData;
+	case EBlockMaterialType::Leaves:
+		return LeavesChunkMeshData;
+	case EBlockMaterialType::Opaque:
+		return OpaqueChunkMeshData;
+	case EBlockMaterialType::Grass:
+		return GrassChunkMeshData;
+	default:
+		return OpaqueChunkMeshData;
 	}
-	return OpaqueChunkMeshData;
 }
 
 int& AChunkBase::GetVertexCountForBlock(EBlock BlockType)
 {
-	if (const FBlockSettings* Settings = GetBlockData(BlockType))
+	FBlockSettings Settings = GetBlockData(BlockType);
+	switch (Settings.MaterialType)
 	{
-		switch (Settings->MaterialType)
-		{
-		case EBlockMaterialType::Water:
-			return WaterVertexCount;
-		case EBlockMaterialType::Leaves:
-			return LeavesVertexCount;
-		case EBlockMaterialType::Opaque:
-			return OpaqueVertexCount;
-		case EBlockMaterialType::Grass:
-			return GrassVertexCount;
-		default:
-			return OpaqueVertexCount;
-		}
+	case EBlockMaterialType::Water:
+		return WaterVertexCount;
+	case EBlockMaterialType::Leaves:
+		return LeavesVertexCount;
+	case EBlockMaterialType::Opaque:
+		return OpaqueVertexCount;
+	case EBlockMaterialType::Grass:
+		return GrassVertexCount;
+	default:
+		return OpaqueVertexCount;
 	}
-	return OpaqueVertexCount;
 }

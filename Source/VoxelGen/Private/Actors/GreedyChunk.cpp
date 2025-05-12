@@ -48,12 +48,9 @@ void AGreedyChunk::GenerateMesh()
         Mask.SetNum(InnerAxisSize1 * InnerAxisSize2);
 
         // Determine if a block is "Solid Opaque"
-        auto IsSolidOpaque = [&](EBlock BlockType, const FBlockSettings* Settings) -> bool {
+        auto IsSolidOpaque = [&](EBlock BlockType, const FBlockSettings& Settings) -> bool {
             if (BlockType == EBlock::Air) return false;
-            if (Settings) {
-                return Settings->bIsSolid && !Settings->bIsTransparent;
-            }
-            return true; 
+            return Settings.bIsSolid && !Settings.bIsTransparent;
         };
 
         // Sweep along the current axis
@@ -68,33 +65,18 @@ void AGreedyChunk::GenerateMesh()
                 // Traverse along Axis1 (e.g., X) - Width of the slice
                 for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < InnerAxisSize1; ++ChunkItr[Axis1])
                 {
-                    // Skip if the current position is outside the chunk bounds
-                    if (Axis == 0 && ChunkItr.X == -1)
-                    {
-                        Mask[N++] = FMask{EBlock::Air, 0};
-                        continue;
-                    }
-                    if (Axis == 1 && ChunkItr.Y == -1)
-                    {
-                        Mask[N++] = FMask{EBlock::Air, 0};
-                        continue;
-                    }
-                    if (Axis == 2 && ChunkItr.Z == -1)
-                    {
-                        Mask[N++] = FMask{EBlock::Air, 0};
-                        continue;
-                    }
-                    
                     const EBlock CurrentBlockType = GetBlockAtPosition(ChunkItr);
-                    const EBlock CompareBlockType = GetBlockAtPosition(ChunkItr + AxisMask);
+                    FBlockSettings CurrentSettings = GetBlockData(CurrentBlockType);
 
-                    const FBlockSettings* CurrentSettings = GetBlockData(CurrentBlockType);
-                    const FBlockSettings* CompareSettings = GetBlockData(CompareBlockType);
+                    EBlock CompareBlockType = GetBlockAtPosition(ChunkItr + AxisMask);
+                    FBlockSettings CompareSettings = GetBlockData(CompareBlockType);
 
                     bool bCurrentIsSolidOpaque = IsSolidOpaque(CurrentBlockType, CurrentSettings);
                     bool bCompareIsSolidOpaque = IsSolidOpaque(CompareBlockType, CompareSettings);
 
-                    FMask ResultMask = {EBlock::Air, 0}; // Default to no face
+                    FBlockSettings DefaultSettings;
+
+                    FMask ResultMask = {DefaultSettings, 0}; // Default to no face
 
                     if (bCurrentIsSolidOpaque == bCompareIsSolidOpaque)
                     {
@@ -104,8 +86,8 @@ void AGreedyChunk::GenerateMesh()
                             bool bCurrentIsAir = (CurrentBlockType == EBlock::Air);
                             bool bCompareIsAir = (CompareBlockType == EBlock::Air);
 
-                            bool bCurrentIsTransparent = CurrentSettings && CurrentSettings->bIsTransparent;
-                            bool bCompareIsTransparent = CompareSettings && CompareSettings->bIsTransparent;
+                            bool bCurrentIsTransparent = CurrentSettings.bIsTransparent;
+                            bool bCompareIsTransparent = CompareSettings.bIsTransparent;
 
                             // Rule 1: Transparent vs. Same Transparent (e.g. Water vs Water) -> No face
                             if (bCurrentIsTransparent && bCompareIsTransparent && CurrentBlockType == CompareBlockType)
@@ -115,19 +97,19 @@ void AGreedyChunk::GenerateMesh()
                             // Rule 2: Current is (Transparent or Masked/NonSolid) AND Compare is Air
                             else if (!bCurrentIsAir && bCompareIsAir)
                             {
-                                ResultMask = {CurrentBlockType, 1};
+                                ResultMask = {CurrentSettings, 1};
                             }
                             // Rule 3: Current is Air AND Compare is (Transparent or Masked/NonSolid)
                             else if (bCurrentIsAir && !bCompareIsAir)
                             {
-                                ResultMask = {CompareBlockType, -1};
+                                ResultMask = {CompareSettings, -1};
                             }
                             // Rule 4: Both are (Transparent or Masked/NonSolid) but not Air, and not same-type transparent.
                             // (Water vs Glass, Water vs Leaves, Leaves vs Flowers)
                             // Greedy mesher picks one. Prioritize CurrentBlock for normal = 1.
                             else if (!bCurrentIsAir && !bCompareIsAir)
                             {
-                                ResultMask = {CurrentBlockType, 1};
+                                ResultMask = {CurrentSettings, 1};
                             }
                         }
                     }
@@ -135,13 +117,14 @@ void AGreedyChunk::GenerateMesh()
                     {
                         if (bCurrentIsSolidOpaque) // Current is SolidOpaque, Compare is (Air, Transparent, or Masked/NonSolid)
                         {
-                            ResultMask = {CurrentBlockType, 1}; // Stone vs Water, Stone vs Air
+                            ResultMask = {CurrentSettings, 1}; // Stone vs Water, Stone vs Air
                         }
                         else // Current is (Air, Transparent, or Masked/NonSolid), Compare is SolidOpaque
                         {
-                            ResultMask = {CompareBlockType, -1}; // Water vs Stone, Air vs Stone
+                            ResultMask = {CompareSettings, -1}; // Water vs Stone, Air vs Stone
                         }
                     }
+                    
                     Mask[N++] = ResultMask;
                 }
             }
@@ -192,14 +175,18 @@ void AGreedyChunk::GenerateMesh()
                         DeltaAxis1[Axis1] = Width; 
                         DeltaAxis2[Axis2] = Height;
 
+                        if (CurrentMaskValue.BlockProperties.RenderMode == EBlockRenderMode::Cube)
+                        {
+                            CreateQuad(
+                                CurrentMaskValue, AxisMask, Width, Height,
+                                QuadStartPos,
+                                QuadStartPos + DeltaAxis1,
+                                QuadStartPos + DeltaAxis2,
+                                QuadStartPos + DeltaAxis1 + DeltaAxis2
+                            );
+                        }
+
                         // Create a quad for the current visible face
-                        CreateQuad(
-                            CurrentMaskValue, AxisMask, Width, Height,
-                            QuadStartPos,
-                            QuadStartPos + DeltaAxis1,
-                            QuadStartPos + DeltaAxis2,
-                            QuadStartPos + DeltaAxis1 + DeltaAxis2
-                        );
 
                         // Reset delta values for next quad
                         DeltaAxis1 = FIntVector::ZeroValue;
@@ -211,7 +198,7 @@ void AGreedyChunk::GenerateMesh()
                         {
                             for (int k = 0; k < Width; ++k)
                             {
-                                Mask[N + k + l * InnerAxisSize1] = FMask{EBlock::Air, 0};
+                                Mask[N + k + l * InnerAxisSize1] = FMask{FBlockSettings(), 0};
                             }
                         }
 
@@ -226,6 +213,27 @@ void AGreedyChunk::GenerateMesh()
                         ++N;
                     }
                 }
+            }
+        }
+    }
+
+    const int32 ChunkSize   = FChunkData::GetChunkSize(GetWorld());
+    const int32 ChunkHeight = FChunkData::GetChunkHeight(GetWorld());
+
+    for (int x = 0; x < ChunkSize; ++x)
+    {
+        for (int y = 0; y < ChunkSize; ++y)
+        {
+            for (int z = 0; z < ChunkHeight; ++z)
+            {
+                FIntVector Pos(x,y,z);
+                EBlock BlockType = GetBlockAtPosition(Pos);
+                FBlockSettings Settings = GetBlockData(BlockType);
+
+                if (Settings.RenderMode != EBlockRenderMode::CrossPlanes)
+                    continue;
+
+                CreateCrossPlanes(Pos, BlockType, Settings);
             }
         }
     }
@@ -245,10 +253,10 @@ void AGreedyChunk::CreateQuad(
     if (!GetWorld()) return;
     
     const auto Normal = FVector(AxisMask * Mask.Normal);
-    const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
+    const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.BlockProperties.BlockID, Normal));
     
-    FChunkMeshData& TargetMeshData = GetMeshDataForBlock(Mask.Block);
-    int& TargetVertexCount = GetVertexCountForBlock(Mask.Block);
+    FChunkMeshData& TargetMeshData = GetMeshDataForBlock(Mask.BlockProperties.BlockID);
+    int& TargetVertexCount = GetVertexCountForBlock(Mask.BlockProperties.BlockID);
 
     TargetMeshData.Vertices.Append({
         FVector(V1) * FChunkData::GetScaledBlockSize(GetWorld()),
@@ -294,5 +302,5 @@ void AGreedyChunk::CreateQuad(
 
 bool AGreedyChunk::CompareMask(const FMask& M1, const FMask& M2) const
 {
-    return M1.Block == M2.Block && M1.Normal == M2.Normal;
+    return M1.BlockProperties.BlockID == M2.BlockProperties.BlockID && M1.Normal == M2.Normal;
 }
