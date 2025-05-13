@@ -102,6 +102,7 @@ void AChunkWorld::RegenerateWorld()
     Seed = FChunkData::GetSeed(this);
     ChunkSize = FChunkData::GetChunkSize(this);
     ScaledBlockSize = FChunkData::GetScaledBlockSize(this);
+    LoadDistance = DrawDistance + 1;
     if (TerrainGenerator)
     {
         TerrainGenerator->UpdateSeed(Seed);

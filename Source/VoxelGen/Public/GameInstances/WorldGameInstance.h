@@ -16,10 +16,10 @@ public:
 	int32 Seed = 1000;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
-	int32 ChunkSize = 32;
+	int32 ChunkSize = 16;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
-	int32 ChunkHeight = 128;
+	int32 ChunkHeight = 256;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
 	float BlockSize = 100.f;

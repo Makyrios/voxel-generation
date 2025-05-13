@@ -74,6 +74,7 @@ protected:
 
 	FChunkMeshData& GetMeshDataForBlock(EBlock BlockType);
 	int& GetVertexCountForBlock(EBlock BlockType);
+    void CacheBlockDataTable();
 
 private:
 	void ApplyMesh();
@@ -121,6 +122,8 @@ protected:
 	AChunkWorld* ParentWorld;
 	
 	TArray<FVector> BlockVerticies;
+
+    TMap<EBlock, FBlockSettings> BlockSettingsCache;
 	
 	const int BlockTriangles[24] = {
 		0,1,2,3, // Forward

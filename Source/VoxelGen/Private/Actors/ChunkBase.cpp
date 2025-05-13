@@ -37,8 +37,9 @@ void AChunkBase::BeginPlay()
 			FVector(0,BlockSize,0),
 			FVector(0,0,0)
 	};
-	
+
 	ChunkColumns.SetNum(FChunkData::GetChunkSize(this) * FChunkData::GetChunkSize(this));
+    CacheBlockDataTable();
 }
 
 void AChunkBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -230,17 +231,9 @@ FBlockSettings AChunkBase::GetBlockData(EBlock BlockType) const
 	const FString EnumString = UEnum::GetValueAsString(BlockType);
 	const FName RowName = FName(EnumString.RightChop(EnumString.Find(TEXT("::")) + 2));
 	
-	FBlockSettings* FoundRow = BlockDataTable->FindRow<FBlockSettings>(RowName, TEXT("Looking up BlockData"));
-	if (!FoundRow)
-	{
-		// Fallback for Air or undefined blocks
-		const FBlockSettings AirDataDefault;
-		if (BlockType == EBlock::Air) return AirDataDefault;
-
-		UE_LOG(LogTemp, Warning, TEXT("BlockData not found for type: %s"), *RowName.ToString());
-		return FBlockSettings();
-	}
-	return *FoundRow;
+    const FBlockSettings& FoundRow = BlockSettingsCache[BlockType];
+    
+	return FoundRow;
 }
 
 bool AChunkBase::ShouldRenderFace(const FIntVector& Position) const
@@ -564,4 +557,24 @@ int& AChunkBase::GetVertexCountForBlock(EBlock BlockType)
 	default:
 		return OpaqueVertexCount;
 	}
+}
+
+void AChunkBase::CacheBlockDataTable()
+{
+    if (!BlockDataTable) return;
+    UEnum* EnumPtr = StaticEnum<EBlock>();
+    for (int32 Value = 0; Value < EnumPtr->NumEnums() - 1; ++Value)
+    {
+        const FString EnumString = EnumPtr->GetNameStringByIndex(Value);
+        const FName RowName = FName(EnumString);
+        
+        if (FBlockSettings* Row = BlockDataTable->FindRow<FBlockSettings>(RowName, TEXT("Caching")))
+        {
+            BlockSettingsCache.Add(static_cast<EBlock>(Value), *Row);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("No DataTable row for block type %s"), *RowName.ToString());
+        }
+    }
 }
