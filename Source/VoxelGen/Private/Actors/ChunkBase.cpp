@@ -98,7 +98,6 @@ void AChunkBase::ApplyMesh()
 	bCanChangeBlocks = true;
 	bIsProcessingMesh = false;
 	bIsMeshInitialized = true;
-
 }
 
 FIntVector AChunkBase::GetPositionInDirection(EDirection Direction, const FIntVector& Position) const

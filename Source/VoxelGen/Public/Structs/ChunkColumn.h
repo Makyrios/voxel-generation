@@ -55,11 +55,7 @@ public:
 	{
 		Blocks.SetNum(ChunkHeight);
 	}
-	
-	// void GenerateBlocks(const FBiomeSettings* BiomeSettings);
-
-	// EHumidityType GetHumidityType() const { return HumidityType; }
-	// ETemperatureType GetTemperatureType() const { return TemperatureType; }
+    
 	EBiomeType GetBiomeType() const { return BiomeType; }
 
 	void SetBiomeType(EBiomeType NewBiomeType) { BiomeType = NewBiomeType;}

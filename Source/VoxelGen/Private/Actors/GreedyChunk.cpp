@@ -146,7 +146,6 @@ void AGreedyChunk::GenerateMesh()
                         
                         // Temporarily set ChunkItr to the start of the potential quad in the current slice
                         // ChunkItr[Axis] is already set to the current slice's depth.
-                        // We need to set ChunkItr[Axis1] and ChunkItr[Axis2] based on i and j.
                         FIntVector QuadStartPos = ChunkItr;
                         QuadStartPos[Axis1] = i;
                         QuadStartPos[Axis2] = j;

@@ -87,16 +87,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Noise")
 	TObjectPtr<UNoiseGenerationPreset> NoiseGenerationPreset;
-	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	// TObjectPtr<UNoiseOctaveSettingsAsset> ContinentalnessNoiseSettings;
-	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	// TObjectPtr<UNoiseOctaveSettingsAsset> ErosionNoiseSettings;
-	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	// TObjectPtr<UNoiseOctaveSettingsAsset> WeirdnessNoiseSettings;
-	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	// TObjectPtr<UNoiseOctaveSettingsAsset> TemperatureNoiseSettings;
-	// UPROPERTY(EditAnywhere, Category = "Settings|Noise")
-	// TObjectPtr<UNoiseOctaveSettingsAsset> HumidityNoiseSettings;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Terrain Generation")
 	int32 WaterThreshold = 55;
@@ -119,7 +109,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings|Splines")
 	float ContinentalnessWeight = 0.5f;
 	UPROPERTY(EditAnywhere, Category = "Settings|Splines")
-	float ErosionWeight = 0.2f; // This was unused in Height Calc? Add if needed.
+	float ErosionWeight = 0.2f;
 	UPROPERTY(EditAnywhere, Category = "Settings|Splines")
 	float PeaksValleysWeight = 0.3f;
 
