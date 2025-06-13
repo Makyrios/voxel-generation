@@ -70,8 +70,8 @@ After successful project setup, you can:
 
 ## Screenshots
 
-*   [](https://i.imgur.com/t9HlPkw.png)
-*   [](https://i.imgur.com/b5dgDqI.png)
-*   [](https://i.imgur.com/uybEOEY.png)
-*   [Naive meshing](https://i.imgur.com/t5PcGS9.jpeg)
-*   [Greedy meshing](https://i.imgur.com/v8EesGR.jpeg)
+*   ![](https://i.imgur.com/mfSSKlV.jpeg)
+*   ![](https://i.imgur.com/9whCssb.jpeg)
+*   ![](https://i.imgur.com/uybEOEY.png)
+*   ![Naive meshing](https://i.imgur.com/t5PcGS9.jpeg)
+*   ![Greedy meshing](https://i.imgur.com/v8EesGR.jpeg)
