@@ -7,6 +7,10 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Actors/ChunkBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Structs/ChunkData.h"
+#include "VoxelGen/Enums.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -25,7 +29,6 @@ AVoxelGenerationCharacter::AVoxelGenerationCharacter()
 	Mesh1P->bCastDynamicShadow = false;
 	Mesh1P->CastShadow = false;
 	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
-
 }
 
 void AVoxelGenerationCharacter::BeginPlay()
@@ -34,7 +37,15 @@ void AVoxelGenerationCharacter::BeginPlay()
 }
 
 void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
+{
+	const APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController) return;
+	
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+	{
+		Subsystem->AddMappingContext(InputMappingContext, 0);
+	}
+	
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
@@ -43,10 +54,15 @@ void AVoxelGenerationCharacter::SetupPlayerInputComponent(UInputComponent* Playe
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Move);
 
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Look);
-	}
-	else
-	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+
+		EnhancedInputComponent->BindAction(SpawnBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::SpawnBlock);
+
+		EnhancedInputComponent->BindAction(DestroyBlockAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::DestroyBlock);
+
+		EnhancedInputComponent->BindAction(FlyAction, ETriggerEvent::Completed, this, &AVoxelGenerationCharacter::Fly);
+
+		EnhancedInputComponent->BindAction(AscendAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Ascend);
+		EnhancedInputComponent->BindAction(DescendAction, ETriggerEvent::Triggered, this, &AVoxelGenerationCharacter::Descend);
 	}
 }
 
@@ -70,5 +86,92 @@ void AVoxelGenerationCharacter::Look(const FInputActionValue& Value)
 	{
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AVoxelGenerationCharacter::DestroyBlock()
+{
+	FHitResult HitResult;
+	FVector TraceStart = FirstPersonCameraComponent->GetComponentLocation();
+	FVector TraceEnd = TraceStart + FirstPersonCameraComponent->GetForwardVector() * InteractionRange;
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+	if (!bHit) return;
+
+	if (AChunkBase* Chunk = Cast<AChunkBase>(HitResult.GetActor()))
+	{
+		const FVector& HitLocation = HitResult.Location;
+		const FVector& ImpactNormal = HitResult.ImpactNormal;
+		
+		float BlockScaledSize = FChunkData::GetBlockSize(this) * FChunkData::GetBlockScale(this);
+		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(this, InteractedBlockPosition);
+		
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(this, InteractedWorldBlockPosition);
+		Chunk->DestroyBlock(LocalChunkBlockPosition);
+	}
+}
+
+void AVoxelGenerationCharacter::SpawnBlock()
+{
+	FHitResult HitResult;
+	FVector TraceStart = FirstPersonCameraComponent->GetComponentLocation();
+	FVector TraceEnd = TraceStart + FirstPersonCameraComponent->GetForwardVector() * InteractionRange;
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+	if (!bHit) return;
+
+	if (AChunkBase* Chunk = Cast<AChunkBase>(HitResult.GetActor()))
+	{
+		const FVector& HitLocation = HitResult.Location;
+		const FVector& ImpactNormal = HitResult.ImpactNormal;
+		float BlockScaledSize = FChunkData::GetBlockSize(this) * FChunkData::GetBlockScale(this);
+		
+		FVector InteractedBlockPosition = HitLocation - ImpactNormal * (BlockScaledSize / 2);
+		FVector SpawnBlockPosition = HitLocation + ImpactNormal * (BlockScaledSize / 2);
+
+		FIntVector InteractedWorldBlockPosition = FChunkData::GetWorldBlockPosition(this, InteractedBlockPosition);
+		FIntVector WorldBlockPosition = FChunkData::GetWorldBlockPosition(this, SpawnBlockPosition);
+		
+		// Get the local position of the block in the chunk (can exceed the chunk size to allow for block spawning in adjacent chunks)
+		FIntVector LocalChunkBlockPosition = FChunkData::GetLocalBlockPosition(this, InteractedWorldBlockPosition) + (WorldBlockPosition - InteractedWorldBlockPosition);
+		Chunk->SpawnBlock(LocalChunkBlockPosition, EBlock::Dirt);
+	}
+}
+
+void AVoxelGenerationCharacter::Fly()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			MovementComponent->SetMovementMode(MOVE_Walking);
+		}
+		else
+		{
+			MovementComponent->SetMovementMode(MOVE_Flying);
+		}
+	}
+}
+
+void AVoxelGenerationCharacter::Ascend()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			AddMovementInput(FVector::UpVector, VerticalMoveSpeed);
+		}
+	}
+}
+
+void AVoxelGenerationCharacter::Descend()
+{
+	if (auto MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->IsFlying())
+		{
+			AddMovementInput(FVector::DownVector, VerticalMoveSpeed);
+		}
 	}
 }
